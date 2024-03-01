@@ -1,0 +1,3 @@
+/mnt/c/c++ proj/flow_dynamics/flow_dynamic/build/CMakeFiles/PROJ.dir
+/mnt/c/c++ proj/flow_dynamics/flow_dynamic/build/CMakeFiles/edit_cache.dir
+/mnt/c/c++ proj/flow_dynamics/flow_dynamic/build/CMakeFiles/rebuild_cache.dir

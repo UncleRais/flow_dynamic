@@ -1,0 +1,1 @@
+/usr/bin/g++  -fopenmp -std=c++17 -O2  -O3 -DNDEBUG CMakeFiles/PROJ.dir/main.cpp.o -o PROJ 
