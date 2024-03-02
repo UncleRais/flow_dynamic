@@ -1,57 +1,34 @@
+#include "vorcity_transfer.h"
+#include "thermal_conductivity.h"
 
-#include <iostream>
-#include "library/Eigen/Sparse"
-#include "library/Eigen/Dense"
-#include <omp.h>
-#include <vector>
-#include <string>
-#include <iomanip>
+// mat_coeffs: matrix nonzero elements
+// sol: first half of elements - omega, second - psi
+vector solve(const problem_params& ps) {
+    size_type n = ps._size, time_steps = ps._steps;  
+    vector rhs(n), sol_prev(n), sol_curr(n);
 
-typedef Eigen::SparseMatrix<double> Matrix;
-typedef Eigen::Triplet<double> T;
+    // if needed, here we can work with initial T, psi and omega distributions
+    // by default psi, omega = 0
+    // T0 = delta_function(L / 2, H / 2) in order to obtain disturbance -> vorcity
 
-void buildProblem(std::vector<T>& coefficients, Eigen::VectorXd& b, int n){
-    for (std::size_t i = 0; i < n; ++i) {
-        b[i] = 1.0;
-        for (std::size_t j = 0; j < n; ++j) 
-            if(i == j) {
-                const double val = 1.0;
-                coefficients.push_back(T(i, j, val));
-            };
+    //time iterations
+    for (size_type k = 0; k < time_steps; ++k) {
+        //vorcity_transfer::solve(ps, sol_curr, sol_prev, rhs);
+
     };
+    
+    return sol_curr;
 };
 
+void write_to_vtu(std::string filename, const vector& sol){
+
+};
+
+
 int main(int argc, char** argv) {
-
-    int n = 5;  // size of the image
-
-    // Assembly:
-    std::vector<T> coefficients;            // list of non-zeros coefficients
-    Eigen::VectorXd b(n);                   // the right hand side-vector resulting from the constraints
-    buildProblem(coefficients, b, n);
-
-    Matrix A(n, n);
-    A.setFromTriplets(coefficients.begin(), coefficients.end());
-
-    
-    for (std::size_t i = 0; i < n; ++i) {
-        std::cout << "{ ";
-        for (std::size_t j = 0; j < n; ++j) {
-            std::cout << std::setw(9) << std::setprecision(8) << A.coeffRef(i, j) << " ";
-        };
-        std::cout << " }" << std::endl;
-    };
-    
-
-    // Solving:
-    Eigen::SimplicialCholesky<Matrix> chol(A);  // performs a Cholesky factorization of A
-    Eigen::VectorXd x = chol.solve(b);         // use the factorization to solve for the given right hand side
-
-    std::cout << "{ ";
-    for (auto& el: x) {
-        std::cout << el << " ";
-    };
-    std::cout << " }" << std::endl;
-
+    // Nx = 2, Ny = 2, steps = 100, L = 1.0, H = 1.0, time = 1.0
+    const problem_params params(2, 2, 100, 1.0, 1.0, 1.0);
+    vector sol = solve(params);
+    write_to_vtu("sol.vtu", sol);
     return 0;
 };
