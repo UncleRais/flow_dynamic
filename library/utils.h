@@ -44,7 +44,7 @@ struct problem_params {
     //mesh indexation convertation to matrix indexation
     std::pair<size_type, size_type> ij_to_rc(size_type template_i, size_type template_j, 
                                              size_type term_i,     size_type term_j, 
-                                             size_type down_or_up,      size_type psi_or_omega) const {
+                                             size_type down_or_up, size_type psi_or_omega) const {
         // row corresponds to the 'k' of main template vertex
         size_type row = ij_to_k(template_i, template_j, down_or_up);
         // col corresponds to the 'k' of the term we want to add

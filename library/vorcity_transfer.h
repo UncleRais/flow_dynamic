@@ -122,7 +122,7 @@ namespace vorcity_transfer {
         for (size_type i = 1; i < Nx; ++i)
             for (size_type j = 1; i < Ny; ++i) {
                 //rhs
-                size_type k = ps.ij_to_k(i, j, 0);
+                size_type k = ps.ij_to_k(i, j, 1);
                 rhs[k] = 0.0;
 
                 //template
