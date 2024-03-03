@@ -19,11 +19,21 @@ namespace slae_solver {
 
     void sparse_LU(const std::vector<triplet>& coefficients, vector& solution, const vector& rhs, bool verbose = false) {
         assert(rhs.rows() > 0 && rhs.cols() > 0 && coefficients.size() > 0);
+
         const size_type n = rhs.rows();
+        //std::cout << n << std::endl;
         matrix A(n, n);
         A.setFromTriplets(coefficients.begin(), coefficients.end());
 
         if (verbose) print_system(A, rhs);
+
+        // for (size_t i = 0; i < n; ++i) {
+        //     T sum = 0.0;
+        //     for (size_t j = 0; j < n; ++j) {
+        //         sum += A.coeff(i, j);
+        //     }
+        //     if (!(sum > 0.0)) std::cout << i << std::endl;
+        // }
 
         Eigen::SparseLU<matrix, Eigen::COLAMDOrdering<int>> LU_solver;
         LU_solver.analyzePattern(A);     // Compute the ordering permutation vector from the structural pattern of A
