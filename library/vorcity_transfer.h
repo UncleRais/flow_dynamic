@@ -41,7 +41,8 @@ namespace vorcity_transfer {
         for (size_type i = 1; i < Nx; ++i)
             for (size_type j = 1; i < Ny; ++i) {
                 //rhs
-                size_type k = ps.ij_to_k(i, j, 0);
+                size_type k = ps.ij_to_k(i, j, eq);
+                // HERE will be the temperature impact
                 rhs[k] = div_tau * sol_prev[k];
 
                 //template
@@ -78,7 +79,7 @@ namespace vorcity_transfer {
         };
 
         for (size_type j = 1; j < count_y - 1; ++j) {   // BC left (without corners)
-            auto id_w0j=     ps.ij_to_rc(0, j, 0, j, eq, 0);
+            auto id_w0j =    ps.ij_to_rc(0, j, 0, j, eq, 0);
             auto id_psi_0j = ps.ij_to_rc(0, j, 0, j, eq, 1);
             auto id_psi_1j = ps.ij_to_rc(0, j, 1, j, eq, 1);
             A_nonzero.push_back(triplet(id_w0j.first,    id_w0j.second,     1.0));
@@ -171,7 +172,8 @@ namespace vorcity_transfer {
 
     void solve(const problem_params& ps, vector& sol_prev, vector& sol_curr, vector& velocity_u, vector& velocity_v, vector& rhs) {
         calc_velocity_on_vertices(ps, sol_prev, velocity_u, velocity_v);
-        std::vector<triplet> A_nonzero;                             
+        std::vector<triplet> A_nonzero;   
+        A_nonzero.reserve(ps._size);                          
         build_system_transfer(ps, A_nonzero, sol_prev, velocity_u, velocity_v, rhs);
         build_system_laplace (ps, A_nonzero, sol_prev, velocity_u, velocity_v, rhs);
         sparse_LU(A_nonzero, sol_curr, rhs, false);
