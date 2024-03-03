@@ -22,10 +22,10 @@ typedef Eigen::Triplet<T> triplet;
 struct problem_params {
     size_type _Nx, _Ny, _steps, _size;
     size_type _count_x, _count_y, _count_k;
-    T _L, _H, _time, _hx, _hy, _tau;
+    T _L, _H, _time, _hx, _hy, _tau, _nu;
 
-    problem_params(size_type Nx, size_type Ny, size_type steps, T L, T H, T time): 
-    _Nx(Nx), _Ny(Ny), _steps(steps), _L(L), _H(H), _time(time) {
+    problem_params(size_type Nx, size_type Ny, size_type steps, T L, T H, T time, T nu): 
+    _Nx(Nx), _Ny(Ny), _steps(steps), _L(L), _H(H), _time(time), _nu(nu) {
         _hx = L / Nx; 
         _hy = H / Ny; 
         _tau = time / steps;
@@ -36,28 +36,19 @@ struct problem_params {
     };
     ~problem_params() = default;
 
+    //mesh indexation convertation to solution vector indexation
+    size_type ij_to_k(size_type i, size_type j, size_type lower) const {
+        return i + j * _count_y + lower * _count_k;
+    };
+
     //mesh indexation convertation to matrix indexation
-    size_type ij_to_k(size_type i, size_type j) const {
-        return i + j * _count_y;
-    };
-
-    std::pair<size_type, size_type> omega_ij_to_rowcol(size_type template_i, size_type template_j, 
-                                                       size_type term_i,     size_type term_j, 
-                                                       size_type lower) const {
+    std::pair<size_type, size_type> ij_to_rc(size_type template_i, size_type template_j, 
+                                             size_type term_i,     size_type term_j, 
+                                             size_type down_or_up,      size_type psi_or_omega) const {
         // row corresponds to the 'k' of main template vertex
-        size_type row = ij_to_k(template_i, template_j) + lower * _count_k;
+        size_type row = ij_to_k(template_i, template_j, down_or_up);
         // col corresponds to the 'k' of the term we want to add
-        size_type col = ij_to_k(term_i, term_j);
-        return std::make_pair(row, col);
-    };
-
-    std::pair<size_type, size_type> psi_ij_to_rowcol(size_type template_i, size_type template_j, 
-                                                     size_type term_i,     size_type term_j, 
-                                                     size_type lower) const {
-        // row corresponds to the 'k' of main template vertex
-        size_type row = ij_to_k(template_i, template_j) + lower * _count_k;
-        // col corresponds to the 'k' of the term we want to add
-        size_type col = ij_to_k(term_i, term_j) + _count_k;
+        size_type col = ij_to_k(term_i, term_j, psi_or_omega);
         return std::make_pair(row, col);
     };
 };
