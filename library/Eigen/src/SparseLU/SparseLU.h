@@ -46,7 +46,7 @@ public:
   bool _solve_impl(const MatrixBase<Rhs> &B, MatrixBase<Dest> &X_base) const
   {
     Dest& X(X_base.derived());
-    eigen_assert(m_sparseLU->info() == Success && "The matrix should be factorized first");
+    eigen_assert(m_sparseLU->info() == Success && "The Matrix should be factorized first");
     EIGEN_STATIC_ASSERT((Dest::Flags&RowMajorBit)==0,
                         THIS_METHOD_IS_ONLY_FOR_COLUMN_MAJOR_MATRICES);
 
@@ -314,7 +314,7 @@ class SparseLU : public SparseSolverBase<SparseLU<_MatrixType,_OrderingType> >, 
     bool _solve_impl(const MatrixBase<Rhs> &B, MatrixBase<Dest> &X_base) const
     {
       Dest& X(X_base.derived());
-      eigen_assert(m_factorizationIsOk && "The matrix should be factorized first");
+      eigen_assert(m_factorizationIsOk && "The Matrix should be factorized first");
       EIGEN_STATIC_ASSERT((Dest::Flags&RowMajorBit)==0,
                         THIS_METHOD_IS_ONLY_FOR_COLUMN_MAJOR_MATRICES);
       
@@ -350,7 +350,7 @@ class SparseLU : public SparseSolverBase<SparseLU<_MatrixType,_OrderingType> >, 
     Scalar absDeterminant()
     {
       using std::abs;
-      eigen_assert(m_factorizationIsOk && "The matrix should be factorized first.");
+      eigen_assert(m_factorizationIsOk && "The Matrix should be factorized first.");
       // Initialize with the determinant of the row matrix
       Scalar det = Scalar(1.);
       // Note that the diagonal blocks of U are stored in supernodes,
@@ -382,7 +382,7 @@ class SparseLU : public SparseSolverBase<SparseLU<_MatrixType,_OrderingType> >, 
       using std::log;
       using std::abs;
 
-      eigen_assert(m_factorizationIsOk && "The matrix should be factorized first.");
+      eigen_assert(m_factorizationIsOk && "The Matrix should be factorized first.");
       Scalar det = Scalar(0.);
       for (Index j = 0; j < this->cols(); ++j)
       {
@@ -405,7 +405,7 @@ class SparseLU : public SparseSolverBase<SparseLU<_MatrixType,_OrderingType> >, 
       */
     Scalar signDeterminant()
     {
-      eigen_assert(m_factorizationIsOk && "The matrix should be factorized first.");
+      eigen_assert(m_factorizationIsOk && "The Matrix should be factorized first.");
       // Initialize with the determinant of the row matrix
       Index det = 1;
       // Note that the diagonal blocks of U are stored in supernodes,
@@ -433,7 +433,7 @@ class SparseLU : public SparseSolverBase<SparseLU<_MatrixType,_OrderingType> >, 
       */
     Scalar determinant()
     {
-      eigen_assert(m_factorizationIsOk && "The matrix should be factorized first.");
+      eigen_assert(m_factorizationIsOk && "The Matrix should be factorized first.");
       // Initialize with the determinant of the row matrix
       Scalar det = Scalar(1.);
       // Note that the diagonal blocks of U are stored in supernodes,

@@ -138,7 +138,7 @@ template<typename _MatrixType> class ComplexSchur
     const ComplexMatrixType& matrixU() const
     {
       eigen_assert(m_isInitialized && "ComplexSchur is not initialized.");
-      eigen_assert(m_matUisUptodate && "The matrix U has not been computed during the ComplexSchur decomposition.");
+      eigen_assert(m_matUisUptodate && "The Matrix U has not been computed during the ComplexSchur decomposition.");
       return m_matU;
     }
 

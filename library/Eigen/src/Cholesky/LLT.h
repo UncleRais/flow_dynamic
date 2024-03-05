@@ -166,7 +166,7 @@ template<typename _MatrixType, int _UpLo> class LLT
     RealScalar rcond() const
     {
       eigen_assert(m_isInitialized && "LLT is not initialized.");
-      eigen_assert(m_info == Success && "LLT failed because matrix appears to be negative");
+      eigen_assert(m_info == Success && "LLT failed because Matrix appears to be negative");
       return internal::rcond_estimate_helper(m_l1_norm, *this);
     }
 

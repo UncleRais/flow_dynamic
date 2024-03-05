@@ -336,7 +336,7 @@ template<typename ExpressionType, int Direction> class VectorwiseOp
     const typename ReduxReturnType<BinaryOp>::Type
     redux(const BinaryOp& func = BinaryOp()) const
     {
-      eigen_assert(redux_length()>0 && "you are using an empty matrix");
+      eigen_assert(redux_length()>0 && "you are using an empty Matrix");
       return typename ReduxReturnType<BinaryOp>::Type(_expression(), internal::member_redux<BinaryOp,Scalar>(func));
     }
 
@@ -375,7 +375,7 @@ template<typename ExpressionType, int Direction> class VectorwiseOp
     EIGEN_DEVICE_FUNC
     const MinCoeffReturnType minCoeff() const
     {
-      eigen_assert(redux_length()>0 && "you are using an empty matrix");
+      eigen_assert(redux_length()>0 && "you are using an empty Matrix");
       return MinCoeffReturnType(_expression());
     }
 
@@ -394,7 +394,7 @@ template<typename ExpressionType, int Direction> class VectorwiseOp
     EIGEN_DEVICE_FUNC
     const MaxCoeffReturnType maxCoeff() const
     {
-      eigen_assert(redux_length()>0 && "you are using an empty matrix");
+      eigen_assert(redux_length()>0 && "you are using an empty Matrix");
       return MaxCoeffReturnType(_expression());
     }
 

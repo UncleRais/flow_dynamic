@@ -398,7 +398,7 @@ template<typename _MatrixType> class FullPivLU
     inline const Inverse<FullPivLU> inverse() const
     {
       eigen_assert(m_isInitialized && "LU is not initialized.");
-      eigen_assert(m_lu.rows() == m_lu.cols() && "You can't take the inverse of a non-square matrix!");
+      eigen_assert(m_lu.rows() == m_lu.cols() && "You can't take the inverse of a non-square Matrix!");
       return Inverse<FullPivLU>(*this);
     }
 
@@ -581,7 +581,7 @@ template<typename MatrixType>
 typename internal::traits<MatrixType>::Scalar FullPivLU<MatrixType>::determinant() const
 {
   eigen_assert(m_isInitialized && "LU is not initialized.");
-  eigen_assert(m_lu.rows() == m_lu.cols() && "You can't take the determinant of a non-square matrix!");
+  eigen_assert(m_lu.rows() == m_lu.cols() && "You can't take the determinant of a non-square Matrix!");
   return Scalar(m_det_pq) * Scalar(m_lu.diagonal().prod());
 }
 

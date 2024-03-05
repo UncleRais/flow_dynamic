@@ -637,7 +637,7 @@ void JacobiSVD<MatrixType, QRPreconditioner>::allocate(Eigen::Index rows, Eigen:
   eigen_assert(!(m_computeFullU && m_computeThinU) && "JacobiSVD: you can't ask for both full and thin U");
   eigen_assert(!(m_computeFullV && m_computeThinV) && "JacobiSVD: you can't ask for both full and thin V");
   eigen_assert(EIGEN_IMPLIES(m_computeThinU || m_computeThinV, MatrixType::ColsAtCompileTime==Dynamic) &&
-              "JacobiSVD: thin U and V are only available when your matrix has a dynamic number of columns.");
+              "JacobiSVD: thin U and V are only available when your Matrix has a dynamic number of columns.");
   if (QRPreconditioner == FullPivHouseholderQRPreconditioner)
   {
       eigen_assert(!(m_computeThinU || m_computeThinV) &&

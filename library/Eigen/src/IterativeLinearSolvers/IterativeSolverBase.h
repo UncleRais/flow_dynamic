@@ -318,7 +318,7 @@ public:
   solveWithGuess(const MatrixBase<Rhs>& b, const Guess& x0) const
   {
     eigen_assert(m_isInitialized && "Solver is not initialized.");
-    eigen_assert(derived().rows()==b.rows() && "solve(): invalid number of rows of the right hand side matrix b");
+    eigen_assert(derived().rows()==b.rows() && "solve(): invalid number of rows of the right hand side Matrix b");
     return SolveWithGuess<Derived, Rhs, Guess>(derived(), b.derived(), x0);
   }
 

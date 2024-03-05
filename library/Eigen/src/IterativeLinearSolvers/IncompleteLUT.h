@@ -248,7 +248,7 @@ void IncompleteLUT<Scalar,StorageIndex>::factorize(const _MatrixType& amat)
   using std::abs;
   using internal::convert_index;
 
-  eigen_assert((amat.rows() == amat.cols()) && "The factorization should be done on a square matrix");
+  eigen_assert((amat.rows() == amat.cols()) && "The factorization should be done on a square Matrix");
   Index n = amat.cols();  // Size of the matrix
   m_lu.resize(n,n);
   // Declare Working vectors and variables

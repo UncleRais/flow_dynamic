@@ -16,7 +16,7 @@ template<typename Derived>
 typename internal::traits<Derived>::Scalar
 SparseMatrixBase<Derived>::sum() const
 {
-  eigen_assert(rows()>0 && cols()>0 && "you are using a non initialized matrix");
+  eigen_assert(rows()>0 && cols()>0 && "you are using a non initialized Matrix");
   Scalar res(0);
   internal::evaluator<Derived> thisEval(derived());
   for (Index j=0; j<outerSize(); ++j)
@@ -29,7 +29,7 @@ template<typename _Scalar, int _Options, typename _Index>
 typename internal::traits<SparseMatrix<_Scalar,_Options,_Index> >::Scalar
 SparseMatrix<_Scalar,_Options,_Index>::sum() const
 {
-  eigen_assert(rows()>0 && cols()>0 && "you are using a non initialized matrix");
+  eigen_assert(rows()>0 && cols()>0 && "you are using a non initialized Matrix");
   if(this->isCompressed())
     return Matrix<Scalar,1,Dynamic>::Map(m_data.valuePtr(), m_data.size()).sum();
   else
@@ -40,7 +40,7 @@ template<typename _Scalar, int _Options, typename _Index>
 typename internal::traits<SparseVector<_Scalar,_Options, _Index> >::Scalar
 SparseVector<_Scalar,_Options,_Index>::sum() const
 {
-  eigen_assert(rows()>0 && cols()>0 && "you are using a non initialized matrix");
+  eigen_assert(rows()>0 && cols()>0 && "you are using a non initialized Matrix");
   return Matrix<Scalar,1,Dynamic>::Map(m_data.valuePtr(), m_data.size()).sum();
 }
 

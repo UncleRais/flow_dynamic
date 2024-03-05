@@ -205,7 +205,7 @@ class SparseQR : public SparseSolverBase<SparseQR<_MatrixType,_OrderingType> >
     bool _solve_impl(const MatrixBase<Rhs> &B, MatrixBase<Dest> &dest) const
     {
       eigen_assert(m_isInitialized && "The factorization should be called first, use compute()");
-      eigen_assert(this->rows() == B.rows() && "SparseQR::solve() : invalid number of rows in the right hand side matrix");
+      eigen_assert(this->rows() == B.rows() && "SparseQR::solve() : invalid number of rows in the right hand side Matrix");
 
       Index rank = this->rank();
       
@@ -246,14 +246,14 @@ class SparseQR : public SparseSolverBase<SparseQR<_MatrixType,_OrderingType> >
     inline const Solve<SparseQR, Rhs> solve(const MatrixBase<Rhs>& B) const 
     {
       eigen_assert(m_isInitialized && "The factorization should be called first, use compute()");
-      eigen_assert(this->rows() == B.rows() && "SparseQR::solve() : invalid number of rows in the right hand side matrix");
+      eigen_assert(this->rows() == B.rows() && "SparseQR::solve() : invalid number of rows in the right hand side Matrix");
       return Solve<SparseQR, Rhs>(*this, B.derived());
     }
     template<typename Rhs>
     inline const Solve<SparseQR, Rhs> solve(const SparseMatrixBase<Rhs>& B) const
     {
           eigen_assert(m_isInitialized && "The factorization should be called first, use compute()");
-          eigen_assert(this->rows() == B.rows() && "SparseQR::solve() : invalid number of rows in the right hand side matrix");
+          eigen_assert(this->rows() == B.rows() && "SparseQR::solve() : invalid number of rows in the right hand side Matrix");
           return Solve<SparseQR, Rhs>(*this, B.derived());
     }
     
@@ -319,7 +319,7 @@ class SparseQR : public SparseSolverBase<SparseQR<_MatrixType,_OrderingType> >
 template <typename MatrixType, typename OrderingType>
 void SparseQR<MatrixType,OrderingType>::analyzePattern(const MatrixType& mat)
 {
-  eigen_assert(mat.isCompressed() && "SparseQR requires a sparse matrix in compressed mode. Call .makeCompressed() before passing it to SparseQR");
+  eigen_assert(mat.isCompressed() && "SparseQR requires a sparse Matrix in compressed mode. Call .makeCompressed() before passing it to SparseQR");
   // Copy to a column major matrix if the input is rowmajor
   typename internal::conditional<MatrixType::IsRowMajor,QRMatrixType,const MatrixType&>::type matCpy(mat);
   // Compute the column fill reducing ordering

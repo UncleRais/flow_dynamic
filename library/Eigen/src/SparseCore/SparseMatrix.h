@@ -214,7 +214,7 @@ class SparseMatrix
 
       Index start = m_outerIndex[outer];
       Index end = m_innerNonZeros ? m_outerIndex[outer] + m_innerNonZeros[outer] : m_outerIndex[outer+1];
-      eigen_assert(end>=start && "you probably called coeffRef on a non finalized matrix");
+      eigen_assert(end>=start && "you probably called coeffRef on a non finalized Matrix");
       if(end<=start)
         return insert(row,col);
       const Index p = m_data.searchLowerIndex(start,end-1,StorageIndex(inner));
@@ -414,8 +414,8 @@ class SparseMatrix
       * \sa insertBack, insertBackByOuterInner */
     inline void startVec(Index outer)
     {
-      eigen_assert(m_outerIndex[outer]==Index(m_data.size()) && "You must call startVec for each inner vector sequentially");
-      eigen_assert(m_outerIndex[outer+1]==0 && "You must call startVec for each inner vector sequentially");
+      eigen_assert(m_outerIndex[outer]==Index(m_data.size()) && "You must call startVec for each inner Vector sequentially");
+      eigen_assert(m_outerIndex[outer+1]==0 && "You must call startVec for each inner Vector sequentially");
       m_outerIndex[outer+1] = m_outerIndex[outer];
     }
 

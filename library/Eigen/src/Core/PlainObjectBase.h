@@ -274,7 +274,7 @@ class PlainObjectBase : public internal::dense_xpr_base<Derived>::type
                    && EIGEN_IMPLIES(ColsAtCompileTime!=Dynamic,cols==ColsAtCompileTime)
                    && EIGEN_IMPLIES(RowsAtCompileTime==Dynamic && MaxRowsAtCompileTime!=Dynamic,rows<=MaxRowsAtCompileTime)
                    && EIGEN_IMPLIES(ColsAtCompileTime==Dynamic && MaxColsAtCompileTime!=Dynamic,cols<=MaxColsAtCompileTime)
-                   && rows>=0 && cols>=0 && "Invalid sizes when resizing a matrix or array.");
+                   && rows>=0 && cols>=0 && "Invalid sizes when resizing a Matrix or array.");
       internal::check_rows_cols_for_overflow<MaxSizeAtCompileTime>::run(rows, cols);
       #ifdef EIGEN_INITIALIZE_COEFFS
         Index size = rows*cols;

@@ -1,224 +1,359 @@
 #pragma once
+
 #include "utils.h"
 #include "slae_solver.h"
 
+
 namespace vorcity_transfer {
-    using namespace slae_solver;
 
-    void set_velocity_on_boundary(const problem_params& ps, vector& velocity_u, vector& velocity_v) {
+
+    void set_velocity_on_boundary(const problem_params &ps, Vector &velocity_u, Vector &velocity_v) {
         // iterations over all boundary grid nodes
-        const auto& BC = ps._BC_velocity;
-        const size_type count_x = ps._count_x, count_y = ps._count_y;
-        const size_type Nx = ps._Nx, Ny = ps._Ny; 
-        for (size_type i = 0; i < count_x; ++i) {   // BC bot
-            auto k = ps.ij_to_k(i, 0, 0);
-            velocity_u[k] = BC[0];
-        };
+        const uint Nx = ps._Nx;
+        const uint Ny = ps._Ny;
 
-        for (size_type j = 0; j < count_y; ++j) {   // BC left  
-            auto k = ps.ij_to_k(0, j, 0);
-            velocity_v[k] = BC[3];
-        };
+        // - Bottom boundary -
+        for (uint i = 0; i <= Nx; ++i) {
+            const auto k = ps.ij_to_k(i, 0);
+            velocity_u[k] = ps._boundary_velocities[0];
+        }
 
-        for (size_type i = 0; i < count_x; ++i) {   // BC top
-            auto k = ps.ij_to_k(i, Ny, 0);
-            velocity_u[k] = BC[2];
-        };
+        // - Right boundary -
+        for (uint j = 0; j <= Ny; ++j) { 
+            const auto k = ps.ij_to_k(Nx, j);
+            velocity_v[k] = ps._boundary_velocities[1];
+        }
 
-        for (size_type j = 0; j < count_y; ++j) {   // BC right 
-            auto k = ps.ij_to_k(Nx, j, 0);
-            velocity_v[k] = BC[1];
-        };
-    };
+        // - Top boundary -
+        for (uint i = 0; i <= Nx; ++i) {
+            const auto k = ps.ij_to_k(i, Ny);
+            velocity_u[k] = ps._boundary_velocities[2];
+        }
 
-    void calc_velocity_on_vertices(const problem_params& ps, const vector& sol_prev, vector& velocity_u, vector& velocity_v) {
-        // iterations over all internal grid nodes
-        const size_type Nx = ps._Nx, Ny = ps._Ny; 
-        const double div_hx = 0.5 / ps._hx, div_hy = 0.5 / ps._hy;
-        for (size_type i = 1; i < Nx; ++i)
-            for (size_type j = 1; j < Ny; ++j) {
-                size_type k = ps.ij_to_k(i, j, 0);
-                velocity_u[k] = div_hy * (sol_prev[ps.ij_to_k(i, j + 1, 1)] - sol_prev[ps.ij_to_k(i, j - 1, 1)]);
-                velocity_v[k] = div_hx * (sol_prev[ps.ij_to_k(i + 1, j, 1)] - sol_prev[ps.ij_to_k(i - 1, j, 1)]);
-            };
-    };
-
-    //      S               ij+1
-    //      |                |
-    //  W---p---E    i-1j---ij---i+1j
-    //      |                |
-    //      N               ij-1
-    // template  ai    * wij   + bi    * wi+1j + ci  * wi-1j  + di    * wij+1 + ei    * wij-1 = fi
-    // ai - indexation in mesh, related with central template vertice 
-    // template  a{pp} * w{p}  + b{pE} * w{E}  + c{pW} * w{W} + d{pS} * w{S}  + e{pN} * w{N}  = f{p}
-    // a{rc} - indexation in matrix, r - row, c - col
+        // - Left boundary -
+        for (uint j = 0; j <= Ny; ++j) {
+            const auto k = ps.ij_to_k(0, j);
+            velocity_v[k] = ps._boundary_velocities[3];
+        }    
+    }
 
 
-    void build_system_transfer(const problem_params& ps, std::vector<triplet>& A_nonzero, const vector& sol_prev,
-                               const vector& velocity_u, const vector& velocity_v, vector& rhs) {
-        const size_type eq = 0; //here we are working with top part of the matrix
-        const size_type Nx = ps._Nx, Ny = ps._Ny; 
-        const double div_tau = 1.0 / ps._tau, div_hx = 1.0 / ps._hx, div_hy = 1.0 / ps._hy;
-        const double div_hx_sq = div_hx * div_hx, div_hy_sq = div_hy * div_hy;
-        const double nu_hx = ps._nu * div_hx_sq, nu_hy = ps._nu * div_hy_sq;
-        const double app = div_tau + nu_hx + nu_hy;
-        // iterations over all internal grid nodes -> regular scheme template
-        for (size_type i = 1; i < Nx; ++i)
-            for (size_type j = 1; j < Ny; ++j) {
-                //rhs
-                size_type k = ps.ij_to_k(i, j, eq);
-                // HERE will be the temperature impact
-                rhs[k] = div_tau * sol_prev[k];
+    void calc_velocity_on_vertices(const problem_params& ps, const Vector& sol_prev, Vector& velocity_u, Vector& velocity_v) {
+        // --- Internal vertices ---
+        const uint Nx = ps._Nx;
+        const uint Ny = ps._Ny;
 
-                //template
-                auto id_wp = ps.ij_to_rc(i, j, i, j, eq, 0);
-                A_nonzero.push_back(triplet(id_wp.first, id_wp.second, app));
+        const T half_of_div_hx = 0.5 / ps._hx;
+        const T half_of_div_hy = 0.5 / ps._hy;
 
-                auto id_wE = ps.ij_to_rc(i, j, i + 1, j, eq, 0);
-                const double apE = 0.5 * div_hx * velocity_u[ps.ij_to_k(i + 1, j, 0)] - nu_hx;
-                A_nonzero.push_back(triplet(id_wE.first, id_wE.second, apE));
+        for (uint i = 1; i <= Nx - 1; ++i) {
+            for (uint j = 1; j <= Ny - 1; ++j) {
+                const uint k = ps.ij_to_k(i, j);
 
-                auto id_wW = ps.ij_to_rc(i, j, i - 1, j, eq, 0);
-                const double apW = - 0.5 * div_hx * velocity_u[ps.ij_to_k(i - 1, j, 0)] - nu_hx;
-                A_nonzero.push_back(triplet(id_wW.first, id_wW.second, apW));
+                const T psi_iplus_j  = sol_prev[ps.ij_to_row(i + 1, j,     Equation::SECOND)];
+                const T psi_iminus_j = sol_prev[ps.ij_to_row(i - 1, j,     Equation::SECOND)];
+                const T psi_i_jplus  = sol_prev[ps.ij_to_row(i,     j + 1, Equation::SECOND)];
+                const T psi_i_jminus = sol_prev[ps.ij_to_row(i,     j - 1, Equation::SECOND)];
 
-                auto id_wS = ps.ij_to_rc(i, j, i, j + 1, eq, 0);
-                const double apS = 0.5 * div_hy * velocity_v[ps.ij_to_k(i, j + 1, 0)] - nu_hy;
-                A_nonzero.push_back(triplet(id_wS.first, id_wS.second, apS));
+                velocity_u[k] = half_of_div_hy * (psi_i_jplus - psi_i_jminus);
+                velocity_v[k] = half_of_div_hx * (psi_iplus_j - psi_iminus_j);
+            }
+        }
+    }
 
-                auto id_wN = ps.ij_to_rc(i, j, i, j - 1, eq, 0);
-                const double apN = - 0.5 * div_hy * velocity_v[ps.ij_to_k(i, j - 1, 0)] - nu_hy;
-                A_nonzero.push_back(triplet(id_wN.first, id_wN.second, apN));
-            };
 
-        // iterations over all boundary grid nodes -> boundary condition
-        const auto& BC = ps._BC_velocity;
-        const size_type count_x = ps._count_x, count_y = ps._count_y;
-        const T two_div_hx_sq = 2.0 * div_hx_sq, two_div_hy_sq = 2.0 * div_hy_sq;
-        const T Ubot   =   2.0 * div_hx * BC[0];
-        const T Vright = - 2.0 * div_hy * BC[1];
-        const T Utop   = - 2.0 * div_hx * BC[2];
-        const T Vleft  =   2.0 * div_hy * BC[3];
-        for (size_type i = 0; i < count_x; ++i) {       // BC bot
-            auto k = ps.ij_to_k(i, 0, eq);
-            auto id_wi0 =    ps.ij_to_rc(i, 0, i, 0, eq, 0);
-            auto id_psi_i0 = ps.ij_to_rc(i, 0, i, 0, eq, 1);
-            auto id_psi_i1 = ps.ij_to_rc(i, 0, i, 1, eq, 1);
-            rhs[k] = Ubot;
-            A_nonzero.push_back(triplet(id_wi0.first,    id_wi0.second,     1.0));
-            A_nonzero.push_back(triplet(id_psi_i1.first, id_psi_i1.second, -two_div_hy_sq));
-            A_nonzero.push_back(triplet(id_psi_i0.first, id_psi_i0.second,  two_div_hy_sq));
-        };
+    // --- 1st equation ---
+    //
+    // Template on internal points: 'crosss-shaped'
+    //
+    //      S                i_j+1
+    //      |                 |
+    //  W---P---E    i-1_j---i_j---i+1_j
+    //      |                 |
+    //      N                i_j-1
+    //
+    // Geographic notation:
+    //
+    // P ~ i_j
+    // W ~ i-1_j
+    // E ~ i+1_j
+    // S ~ i_j-1
+    // N ~ i_j+1
+    //
+    // Template equation:
+    // a_P * w_P  +  a_W * w_W  +  a_E * w_E  +  a_S * w_S  + a_N * w_N = f_i
+    //
+    // While iterating we use .ij_to_rc() and .it_to_rhs_row() methods to automatically
+    // compute 'row' & 'col' matrix indexation corresponding to each term of the template
+    //
+    void build_system_transfer(
+        const problem_params &ps,
+        std::vector<Triplet> &coef_triplets,
+        const Vector &sol_prev,
+        const Vector &velocity_u, const Vector &velocity_v,
+        Vector &rhs
+    ) {
+        const auto equation = Equation::FIRST; // => filling the top half of the matrix
 
-        for (size_type j = 1; j < count_y - 1; ++j) {   // BC left (without corners)
-            auto k = ps.ij_to_k(0, j, eq);
-            auto id_w0j =    ps.ij_to_rc(0, j, 0, j, eq, 0);
-            auto id_psi_0j = ps.ij_to_rc(0, j, 0, j, eq, 1);
-            auto id_psi_1j = ps.ij_to_rc(0, j, 1, j, eq, 1);
-            rhs[k] = Vleft;
-            A_nonzero.push_back(triplet(id_w0j.first,    id_w0j.second,     1.0));
-            A_nonzero.push_back(triplet(id_psi_1j.first, id_psi_1j.second, -two_div_hx_sq));
-            A_nonzero.push_back(triplet(id_psi_0j.first, id_psi_0j.second,  two_div_hx_sq));
-        };
+        const uint Nx      = ps._Nx;
+        const uint Ny      = ps._Ny;
+        const uint count_x = ps._count_x;
+        const uint count_y = ps._count_y;
 
-        for (size_type i = 0; i < count_x; ++i) {       // BC top
-            auto k = ps.ij_to_k(i, Ny, eq);
-            auto id_wiNy =          ps.ij_to_rc(i, Ny, i, Ny,     eq, 0);
-            auto id_psi_iNy_minus = ps.ij_to_rc(i, Ny, i, Ny - 1, eq, 1);
-            auto id_psi_iNy =       ps.ij_to_rc(i, Ny, i, Ny,     eq, 1);
-            rhs[k] = Utop;
-            A_nonzero.push_back(triplet(id_wiNy.first,          id_wiNy.second,           1.0));
-            A_nonzero.push_back(triplet(id_psi_iNy.first,       id_psi_iNy.second,        two_div_hy_sq));
-            A_nonzero.push_back(triplet(id_psi_iNy_minus.first, id_psi_iNy_minus.second, -two_div_hy_sq));
-        };
+        const T div_tau = 1.0 / ps._tau;
+        const T div_hx  = 1.0 / ps._hx;
+        const T div_hy  = 1.0 / ps._hy;
 
-        for (size_type j = 1; j < count_y - 1; ++j) {   // BC right (without corners)
-            auto k = ps.ij_to_k(Nx, j, eq);
-            auto id_wNxj =          ps.ij_to_rc(Nx, j, Nx,     j, eq, 0);
-            auto id_psi_Nx_minusj = ps.ij_to_rc(Nx, j, Nx - 1, j, eq, 1);
-            auto id_psi_Nxj =       ps.ij_to_rc(Nx, j, Nx,     j, eq, 1);
-            rhs[k] = Vright;
-            A_nonzero.push_back(triplet(id_wNxj.first,          id_wNxj.second,           1.0));
-            A_nonzero.push_back(triplet(id_psi_Nxj.first,       id_psi_Nxj.second,        two_div_hx_sq));
-            A_nonzero.push_back(triplet(id_psi_Nx_minusj.first, id_psi_Nx_minusj.second, -two_div_hx_sq));
-        };
-    };
+        const T div_hx2 = div_hx * div_hx;
+        const T div_hy2 = div_hy * div_hy;
 
-    // template  wp + apE * psi_E + app * psi_p + apW * psi_W + apS * psi_W + apN * psi_N = 0
-    void build_system_laplace(const problem_params& ps, std::vector<triplet>& A_nonzero, const vector& sol_prev,
-                              const vector& velocity_u, const vector& velocity_v, vector& rhs) {
-        const size_type eq = 1; //here we are working with bot part of the matrix
-        const size_type Nx = ps._Nx, Ny = ps._Ny; 
-        const double div_hx = 1.0 / ps._hx, div_hy = 1.0 / ps._hy;
-        const double div_hx_sq = div_hx * div_hx, div_hy_sq = div_hy * div_hy;
-        const double apE = div_hx_sq;
-        const double app = -2.0 * (div_hx_sq + div_hy_sq);
-        const double apW = div_hx_sq;
-        const double apS = div_hy_sq;
-        const double apN = div_hy_sq;
+        const T nu_div_hx2 = ps._nu * div_hx2;
+        const T nu_div_hy2 = ps._nu * div_hy2;
 
-        // iterations over all internal grid nodes -> regular scheme template
-        for (size_type i = 1; i < Nx; ++i)
-            for (size_type j = 1; j < Ny; ++j) {
-                //rhs
-                size_type k = ps.ij_to_k(i, j, 1);
-                rhs[k] = 0.0;
+        // --- Internal vertices ---
+        // Iterate regular 'cross-shaped' template
 
-                //template
-                auto id_wp = ps.ij_to_rc(i, j, i, j, eq, 0);
-                A_nonzero.push_back(triplet(id_wp.first, id_wp.second, 1.0));
+        for (uint i = 1; i <= Nx - 1; ++i) {
+            for (uint j = 1; j <= Ny - 1; ++j) {
+                // Fill RHS
+                const auto row = ps.ij_to_row(i, j, equation);
 
-                auto id_psi_p = ps.ij_to_rc(i, j, i, j, eq, 1);
-                A_nonzero.push_back(triplet(id_psi_p.first, id_psi_p.second, app));
+                rhs[row] = div_tau * sol_prev[row]; /// Temperature impact will be added here
 
-                auto id_psi_E = ps.ij_to_rc(i, j, i + 1, j, eq, 1);
-                A_nonzero.push_back(triplet(id_psi_E.first, id_psi_E.second, apE));
+                // Fill Matrix
+                const auto idx_w_P = ps.ij_to_rc(i, j, i,     j,     equation, Variable::OMEGA);
+                const auto idx_w_W = ps.ij_to_rc(i, j, i - 1, j,     equation, Variable::OMEGA);
+                const auto idx_w_E = ps.ij_to_rc(i, j, i + 1, j,     equation, Variable::OMEGA);
+                const auto idx_w_S = ps.ij_to_rc(i, j, i,     j + 1, equation, Variable::OMEGA); /// why is south ~ j + 1?
+                const auto idx_w_N = ps.ij_to_rc(i, j, i,     j - 1, equation, Variable::OMEGA); /// why is north ~ j - 1?
 
-                auto id_psi_W = ps.ij_to_rc(i, j, i - 1, j, eq, 1);
-                A_nonzero.push_back(triplet(id_psi_W.first, id_psi_W.second, apW));
+                const T a_P = div_tau + 2.0 * (nu_div_hx2 + nu_div_hy2); /// added '2.0 *' here, seems we forgot it
+                const T a_W = -0.5 * div_hx * velocity_u[ps.ij_to_k(i - 1, j    )] - nu_div_hx2;
+                const T a_E =  0.5 * div_hx * velocity_u[ps.ij_to_k(i + 1, j    )] - nu_div_hx2;
+                const T a_S =  0.5 * div_hy * velocity_v[ps.ij_to_k(i,     j + 1)] - nu_div_hy2;
+                const T a_N = -0.5 * div_hy * velocity_v[ps.ij_to_k(i,     j - 1)] - nu_div_hy2;
 
-                auto id_psi_S = ps.ij_to_rc(i, j, i, j + 1, eq, 1);
-                A_nonzero.push_back(triplet(id_psi_S.first, id_psi_S.second, apS));
+                coef_triplets.push_back(Triplet(idx_w_P.row, idx_w_P.col, a_P));
+                coef_triplets.push_back(Triplet(idx_w_W.row, idx_w_W.col, a_W));
+                coef_triplets.push_back(Triplet(idx_w_E.row, idx_w_E.col, a_E));
+                coef_triplets.push_back(Triplet(idx_w_S.row, idx_w_S.col, a_S));
+                coef_triplets.push_back(Triplet(idx_w_N.row, idx_w_N.col, a_N));
+            }
+        }
 
-                auto id_psi_N = ps.ij_to_rc(i, j, i, j - 1, eq, 1);
-                A_nonzero.push_back(triplet(id_psi_N.first, id_psi_N.second, apN));
-            };
+        // --- Boundary vertices ---
+        // Apply Thom conditions
 
-        // iterations over all boundary grid nodes -> boundary condition psi = 0
-        const size_type count_x = ps._count_x, count_y = ps._count_y;
-        for (size_type i = 0; i < count_x; ++i)     {   // BC bot
-            auto id_psi_i0 = ps.ij_to_rc(i, 0, i, 0, eq, 1);
-            A_nonzero.push_back(triplet(id_psi_i0.first, id_psi_i0.second, 1.0));
-        };
+        const T two_div_hx_sq = 2.0 * div_hx2;
+        const T two_div_hy_sq = 2.0 * div_hy2;
 
-        for (size_type j = 1; j < count_y - 1; ++j) {   // BC left (without corners) 
-            auto id_psi_0j = ps.ij_to_rc(0, j, 0, j, eq, 1);
-            A_nonzero.push_back(triplet(id_psi_0j.first, id_psi_0j.second, 1.0));
-        };
+        const T BVI_bottom =  2.0 * div_hx * ps._boundary_velocities[0];
+        const T BVI_right  = -2.0 * div_hy * ps._boundary_velocities[1];
+        const T BVI_top    = -2.0 * div_hx * ps._boundary_velocities[2];
+        const T BVI_left   =  2.0 * div_hy * ps._boundary_velocities[3];
+            // 'BVI' means 'Boundary Velocity Impact', refers to a Thom condition term that includes boundary velocity
 
-        for (size_type i = 0; i < count_x; ++i)     {   // BC top
-            auto id_psi_iNy = ps.ij_to_rc(i, Ny, i, Ny, eq, 1);
-            A_nonzero.push_back(triplet(id_psi_iNy.first, id_psi_iNy.second, 1.0));
-        };
+        // - Bottom boundary -
+        for (uint i = 0; i <= Nx; ++i) {
+            // Fill RHS
+            const auto row = ps.ij_to_row(i, 0, equation);
 
-        for (size_type j = 1; j < count_y - 1; ++j) {   // BC right (without corners)
-            auto id_psi_Nxj = ps.ij_to_rc(Nx, j, Nx, j, eq, 1);
-            A_nonzero.push_back(triplet(id_psi_Nxj.first, id_psi_Nxj.second, 1.0));
-        };
+            rhs[row] = BVI_bottom;
 
-    };
+            // Fill Matrix
+            const auto idx_w_i_0   = ps.ij_to_rc(i, 0, i, 0, equation, Variable::OMEGA);
+            const auto idx_psi_i_0 = ps.ij_to_rc(i, 0, i, 0, equation, Variable::PSI  );
+            const auto idx_psi_i_1 = ps.ij_to_rc(i, 0, i, 1, equation, Variable::PSI  );
 
-    void write_to_vtu(const vector& sol, vector& velocity_u, vector& velocity_v){
+            coef_triplets.push_back(Triplet(idx_w_i_0.row, idx_w_i_0.col,      1.0          ));
+            coef_triplets.push_back(Triplet(idx_psi_i_0.row, idx_psi_i_0.col,  two_div_hy_sq));
+            coef_triplets.push_back(Triplet(idx_psi_i_1.row, idx_psi_i_1.col, -two_div_hy_sq));
+        }
 
-    };
+        // - Right boundary (no corners) -
+        for (uint j = 1; j <= Ny - 1; ++j) {
+            // Fill RHS
+            const auto row = ps.ij_to_row(Nx, j, equation);
 
-    void solve(const problem_params& ps, vector& sol_prev, vector& sol_curr, vector& velocity_u, vector& velocity_v, vector& rhs) {
+            rhs[row] = BVI_right;
+
+            // Fill Matrix
+            const auto idx_w_Nx_j        = ps.ij_to_rc(Nx, j, Nx,     j, equation, Variable::OMEGA);
+            const auto idx_psi_Nx_j      = ps.ij_to_rc(Nx, j, Nx,     j, equation, Variable::PSI  );
+            const auto idx_psi_Nxminus_j = ps.ij_to_rc(Nx, j, Nx - 1, j, equation, Variable::PSI  );
+
+            coef_triplets.push_back(Triplet(idx_w_Nx_j.row,        idx_w_Nx_j.col,         1.0          ));
+            coef_triplets.push_back(Triplet(idx_psi_Nx_j.row,      idx_psi_Nx_j.col,       two_div_hx_sq));
+            coef_triplets.push_back(Triplet(idx_psi_Nxminus_j.row, idx_psi_Nxminus_j.col, -two_div_hx_sq));
+        }
+
+        // - Top boundary -
+        for (uint i = 0; i <= Nx; ++i) {
+            // Fill RHS
+            const auto row = ps.ij_to_row(i, Ny, equation);
+
+            rhs[row] = BVI_top;
+
+            // Fill Matrix
+            const auto idx_w_i_Ny        = ps.ij_to_rc(i, Ny, i, Ny,     equation, Variable::OMEGA);
+            const auto idx_psi_i_Ny      = ps.ij_to_rc(i, Ny, i, Ny,     equation, Variable::PSI  );
+            const auto idx_psi_i_Nyminus = ps.ij_to_rc(i, Ny, i, Ny - 1, equation, Variable::PSI  );
+            
+            coef_triplets.push_back(Triplet(idx_w_i_Ny.row,         idx_w_i_Ny.col,        1.0          ));
+            coef_triplets.push_back(Triplet(idx_psi_i_Ny.row,      idx_psi_i_Ny.col,       two_div_hy_sq));
+            coef_triplets.push_back(Triplet(idx_psi_i_Nyminus.row, idx_psi_i_Nyminus.col, -two_div_hy_sq));
+        }
+
+        // - Left boundary (no corners) -
+        for (uint j = 1; j <= Ny - 1; ++j) {
+            // Fill RHS
+            const auto row = ps.ij_to_row(0, j, equation);
+
+            rhs[row] = BVI_left;
+
+            // Fill Matrix
+            const auto idx_w_0_j   = ps.ij_to_rc(0, j, 0, j, equation, Variable::OMEGA);
+            const auto idx_psi_0_j = ps.ij_to_rc(0, j, 0, j, equation, Variable::PSI  );
+            const auto idx_psi_1_j = ps.ij_to_rc(0, j, 1, j, equation, Variable::PSI  );
+
+            coef_triplets.push_back(Triplet(idx_w_0_j.row,   idx_w_0_j.col,    1.0          ));
+            coef_triplets.push_back(Triplet(idx_psi_0_j.row, idx_psi_0_j.col,  two_div_hx_sq));
+            coef_triplets.push_back(Triplet(idx_psi_1_j.row, idx_psi_1_j.col, -two_div_hx_sq));
+            
+        }
+    }
+
+
+    // --- 2nd equation ---
+    //
+    // Template on internal points: 'crosss-shaped'
+    //
+    //      S                i_j+1
+    //      |                 |
+    //  W---P---E    i-1_j---i_j---i+1_j
+    //      |                 |
+    //      N                i_j-1
+    //
+    // Template equation:
+    // w_P  +  a_P * psi_P  +  a_W * psi_W  +  a_E * psi_E  +  a_S * psi_S  + a_N * psi_N = 0
+    //
+    void build_system_laplace(
+        const problem_params &ps,
+        std::vector<Triplet> &coef_triplets,
+        const Vector &sol_prev,
+        const Vector &velocity_u, const Vector &velocity_v,
+        Vector &rhs
+    ) {
+        const auto equation = Equation::SECOND; // => filling the bottom half of the matrix
+
+        const uint Nx      = ps._Nx;
+        const uint Ny      = ps._Ny;
+        const uint count_x = ps._count_x;
+        const uint count_y = ps._count_y;
+
+        const T div_hx = 1.0 / ps._hx;
+        const T div_hy = 1.0 / ps._hy;
+
+        const T div_hx2 = div_hx * div_hx;
+        const T div_hy2 = div_hy * div_hy;
+       
+        const T a_P = -2.0 * (div_hx2 + div_hy2);
+        const T a_W = div_hx2;
+        const T a_E = div_hx2;
+        const T a_S = div_hy2;
+        const T a_N = div_hy2;
+
+        // --- Internal vertices ---
+        // Iterate regular 'cross-shaped' template
+
+        for (uint i = 1; i <= Nx - 1; ++i) {
+            for (uint j = 1; j <= Ny - 1; ++j) {
+                // Fill RHS
+                const auto row = ps.ij_to_row(i, j, equation);
+
+                rhs[row] = 0.0;
+
+                // Fill Matrix
+                const auto idx_w_P   = ps.ij_to_rc(i, j, i,     j,     equation, Variable::OMEGA);
+                const auto idx_psi_P = ps.ij_to_rc(i, j, i,     j,     equation, Variable::PSI  );
+                const auto idx_psi_W = ps.ij_to_rc(i, j, i - 1, j,     equation, Variable::PSI  );
+                const auto idx_psi_E = ps.ij_to_rc(i, j, i + 1, j,     equation, Variable::PSI  );
+                const auto idx_psi_S = ps.ij_to_rc(i, j, i,     j + 1, equation, Variable::PSI  );
+                const auto idx_psi_N = ps.ij_to_rc(i, j, i,     j - 1, equation, Variable::PSI  );
+
+                coef_triplets.push_back(Triplet(idx_w_P.row,   idx_w_P.col,   1.0));
+                coef_triplets.push_back(Triplet(idx_psi_P.row, idx_psi_P.col, a_P));
+                coef_triplets.push_back(Triplet(idx_psi_W.row, idx_psi_W.col, a_W));
+                coef_triplets.push_back(Triplet(idx_psi_E.row, idx_psi_E.col, a_E));
+                coef_triplets.push_back(Triplet(idx_psi_S.row, idx_psi_S.col, a_S));
+                coef_triplets.push_back(Triplet(idx_psi_N.row, idx_psi_N.col, a_N));
+            }
+        }
+
+        // --- Boundary vertices ---
+        // Apply zero-boundary condition: { psi  |boundary  = 0
+        
+        // - Bottom boundary -
+        for (uint i = 0; i <= Nx; ++i) {
+            // Fill RHS
+            // < always stays zero, no need to fill every time >
+
+            // Fill Matrix
+            const auto idx_psi_i_0 = ps.ij_to_rc(i, 0, i, 0, equation, Variable::PSI);
+
+            coef_triplets.push_back(Triplet(idx_psi_i_0.row, idx_psi_i_0.col, 1.0));
+        }
+
+        // - Right boundary (no corners) -
+        for (uint j = 1; j <= Ny - 1; ++j) {
+            // Fill RHS
+            // < always stays zero, no need to fill every time >
+
+            // Fill Matrix
+            const auto idx_psi_Nx_j = ps.ij_to_rc(Nx, j, Nx, j, equation, Variable::PSI);
+
+            coef_triplets.push_back(Triplet(idx_psi_Nx_j.row, idx_psi_Nx_j.col, 1.0));
+        }
+
+        // - Top boundary -
+        for (uint i = 0; i <= Nx; ++i) {
+            // Fill RHS
+            // < always stays zero, no need to fill every time >
+
+            // Fill Matrix
+            const auto idx_psi_i_Ny = ps.ij_to_rc(i, Ny, i, Ny, equation, Variable::PSI);
+
+            coef_triplets.push_back(Triplet(idx_psi_i_Ny.row, idx_psi_i_Ny.col, 1.0));
+        }
+
+        // - Left boundary (no corners) -
+        for (uint j = 1; j <= Ny - 1; ++j) {
+            // Fill RHS
+            // < always stays zero, no need to fill every time >
+
+            // Fill Matrix
+            const auto idx_psi_0_j = ps.ij_to_rc(0, j, 0, j, equation, Variable::PSI);
+            coef_triplets.push_back(Triplet(idx_psi_0_j.row, idx_psi_0_j.col, 1.0));
+        }
+    }
+
+
+    void solve(
+        const problem_params &ps,
+        Vector &sol_prev,   Vector &sol_curr,
+        Vector &velocity_u, Vector &velocity_v,
+        Vector &rhs
+    ) {
         calc_velocity_on_vertices(ps, sol_prev, velocity_u, velocity_v);
-        std::vector<triplet> A_nonzero;   
-        A_nonzero.reserve(ps._size);                          
-        build_system_transfer(ps, A_nonzero, sol_prev, velocity_u, velocity_v, rhs);
-        build_system_laplace (ps, A_nonzero, sol_prev, velocity_u, velocity_v, rhs);
-        sparse_LU(A_nonzero, sol_curr, rhs, false);
+
+        std::vector<Triplet> coef_triplets; // non-zero coefs of matrix 'A' as { i, j, value } triplets
+        coef_triplets.reserve(3 * ps._size); // not an accurate estimate
+
+        build_system_transfer(ps, coef_triplets, sol_prev, velocity_u, velocity_v, rhs);
+        build_system_laplace (ps, coef_triplets, sol_prev, velocity_u, velocity_v, rhs);
+
+        const bool verbose = (ps._size < 30);
+        slae_solvers::sparse_LU(coef_triplets, sol_curr, rhs, verbose);
         sol_curr.swap(sol_prev);
-    };
-};
+    }
+}

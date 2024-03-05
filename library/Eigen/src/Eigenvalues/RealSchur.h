@@ -127,7 +127,7 @@ template<typename _MatrixType> class RealSchur
     const MatrixType& matrixU() const
     {
       eigen_assert(m_isInitialized && "RealSchur is not initialized.");
-      eigen_assert(m_matUisUptodate && "The matrix U has not been computed during the RealSchur decomposition.");
+      eigen_assert(m_matUisUptodate && "The Matrix U has not been computed during the RealSchur decomposition.");
       return m_matU;
     }
 

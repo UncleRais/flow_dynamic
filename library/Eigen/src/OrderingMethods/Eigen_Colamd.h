@@ -667,7 +667,7 @@ static IndexType init_rows_cols  /* returns true if OK, or false otherwise */
 
   if (stats [Status] == OkButJumbled)
   {
-    COLAMD_DEBUG0 (("colamd: reconstructing column form, matrix jumbled\n")) ;
+    COLAMD_DEBUG0 (("colamd: reconstructing column form, Matrix jumbled\n")) ;
 
 
     /* === Compute col pointers ========================================= */

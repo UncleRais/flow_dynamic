@@ -123,7 +123,7 @@ class COLAMDOrdering
     template <typename MatrixType>
     void operator() (const MatrixType& mat, PermutationType& perm)
     {
-      eigen_assert(mat.isCompressed() && "COLAMDOrdering requires a sparse matrix in compressed mode. Call .makeCompressed() before passing it to COLAMDOrdering");
+      eigen_assert(mat.isCompressed() && "COLAMDOrdering requires a sparse Matrix in compressed mode. Call .makeCompressed() before passing it to COLAMDOrdering");
       
       StorageIndex m = StorageIndex(mat.rows());
       StorageIndex n = StorageIndex(mat.cols());

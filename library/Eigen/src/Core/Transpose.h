@@ -344,7 +344,7 @@ template<typename Derived>
 EIGEN_DEVICE_FUNC inline void DenseBase<Derived>::transposeInPlace()
 {
   eigen_assert((rows() == cols() || (RowsAtCompileTime == Dynamic && ColsAtCompileTime == Dynamic))
-               && "transposeInPlace() called on a non-square non-resizable matrix");
+               && "transposeInPlace() called on a non-square non-resizable Matrix");
   internal::inplace_transpose_selector<Derived>::run(derived());
 }
 

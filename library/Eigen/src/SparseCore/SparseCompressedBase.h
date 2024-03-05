@@ -141,7 +141,7 @@ class SparseCompressedBase
 
       Index start = this->outerIndexPtr()[outer];
       Index end = this->isCompressed() ? this->outerIndexPtr()[outer+1] : this->outerIndexPtr()[outer] + this->innerNonZeroPtr()[outer];
-      eigen_assert(end>=start && "you are using a non finalized sparse matrix or written coefficient does not exist");
+      eigen_assert(end>=start && "you are using a non finalized sparse Matrix or written coefficient does not exist");
       internal::LowerBoundIndex p;
       p.value = std::lower_bound(this->innerIndexPtr()+start, this->innerIndexPtr()+end,inner) - this->innerIndexPtr();
       p.found = (p.value<end) && (this->innerIndexPtr()[p.value]==inner);
