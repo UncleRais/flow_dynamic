@@ -104,7 +104,7 @@ struct problem_params {
 
     // mesh indexation convertation to solution vector indexation
     inline uint ij_to_k(uint i, uint j) const {
-        return i + j * _count_y;
+        return i + j * _count_x;
     }
 
     // mesh indexation convertation to matrix indexation
@@ -323,6 +323,3 @@ void build_test_problem(std::vector<Triplet> &coefficients, Eigen::VectorXd &b, 
             };
     };
 };
-
-
-

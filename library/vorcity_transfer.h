@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "utils.h"
 #include "slae_solver.h"
 
@@ -55,8 +57,8 @@ namespace vorcity_transfer {
                 const T psi_i_jplus  = sol_prev[ps.ij_to_row(i,     j + 1, Equation::SECOND)];
                 const T psi_i_jminus = sol_prev[ps.ij_to_row(i,     j - 1, Equation::SECOND)];
 
-                velocity_u[k] = half_of_div_hy * (psi_i_jplus - psi_i_jminus);
-                velocity_v[k] = half_of_div_hx * (psi_iplus_j - psi_iminus_j);
+                velocity_u[k] =  half_of_div_hy * (psi_i_jplus - psi_i_jminus);
+                velocity_v[k] = -half_of_div_hx * (psi_iplus_j - psi_iminus_j);
             }
         }
     }
@@ -124,14 +126,14 @@ namespace vorcity_transfer {
                 const auto idx_w_P = ps.ij_to_rc(i, j, i,     j,     equation, Variable::OMEGA);
                 const auto idx_w_W = ps.ij_to_rc(i, j, i - 1, j,     equation, Variable::OMEGA);
                 const auto idx_w_E = ps.ij_to_rc(i, j, i + 1, j,     equation, Variable::OMEGA);
-                const auto idx_w_S = ps.ij_to_rc(i, j, i,     j + 1, equation, Variable::OMEGA); /// why is south ~ j + 1?
-                const auto idx_w_N = ps.ij_to_rc(i, j, i,     j - 1, equation, Variable::OMEGA); /// why is north ~ j - 1?
+                const auto idx_w_S = ps.ij_to_rc(i, j, i,     j - 1, equation, Variable::OMEGA);
+                const auto idx_w_N = ps.ij_to_rc(i, j, i,     j + 1, equation, Variable::OMEGA);
 
-                const T a_P = div_tau + 2.0 * (nu_div_hx2 + nu_div_hy2); /// added '2.0 *' here, seems we forgot it
+                const T a_P = div_tau + 2.0 * (nu_div_hx2 + nu_div_hy2);
                 const T a_W = -0.5 * div_hx * velocity_u[ps.ij_to_k(i - 1, j    )] - nu_div_hx2;
                 const T a_E =  0.5 * div_hx * velocity_u[ps.ij_to_k(i + 1, j    )] - nu_div_hx2;
-                const T a_S =  0.5 * div_hy * velocity_v[ps.ij_to_k(i,     j + 1)] - nu_div_hy2;
-                const T a_N = -0.5 * div_hy * velocity_v[ps.ij_to_k(i,     j - 1)] - nu_div_hy2;
+                const T a_S =  0.5 * div_hy * velocity_v[ps.ij_to_k(i,     j - 1)] - nu_div_hy2;
+                const T a_N = -0.5 * div_hy * velocity_v[ps.ij_to_k(i,     j + 1)] - nu_div_hy2;
 
                 coef_triplets.push_back(Triplet(idx_w_P.row, idx_w_P.col, a_P));
                 coef_triplets.push_back(Triplet(idx_w_W.row, idx_w_W.col, a_W));
@@ -148,9 +150,9 @@ namespace vorcity_transfer {
         const T two_div_hy_sq = 2.0 * div_hy2;
 
         const T BVI_bottom =  2.0 * div_hx * ps._boundary_velocities[0];
-        const T BVI_right  = -2.0 * div_hy * ps._boundary_velocities[1];
+        const T BVI_right  =  2.0 * div_hy * ps._boundary_velocities[1];
         const T BVI_top    = -2.0 * div_hx * ps._boundary_velocities[2];
-        const T BVI_left   =  2.0 * div_hy * ps._boundary_velocities[3];
+        const T BVI_left   = -2.0 * div_hy * ps._boundary_velocities[3];
             // 'BVI' means 'Boundary Velocity Impact', refers to a Thom condition term that includes boundary velocity
 
         // - Bottom boundary -
@@ -165,9 +167,9 @@ namespace vorcity_transfer {
             const auto idx_psi_i_0 = ps.ij_to_rc(i, 0, i, 0, equation, Variable::PSI  );
             const auto idx_psi_i_1 = ps.ij_to_rc(i, 0, i, 1, equation, Variable::PSI  );
 
-            coef_triplets.push_back(Triplet(idx_w_i_0.row, idx_w_i_0.col,      1.0          ));
-            coef_triplets.push_back(Triplet(idx_psi_i_0.row, idx_psi_i_0.col,  two_div_hy_sq));
-            coef_triplets.push_back(Triplet(idx_psi_i_1.row, idx_psi_i_1.col, -two_div_hy_sq));
+            coef_triplets.push_back(Triplet(idx_w_i_0.row,   idx_w_i_0.col,    1.0          ));
+            coef_triplets.push_back(Triplet(idx_psi_i_0.row, idx_psi_i_0.col, -two_div_hy_sq));
+            coef_triplets.push_back(Triplet(idx_psi_i_1.row, idx_psi_i_1.col, +two_div_hy_sq));
         }
 
         // - Right boundary (no corners) -
@@ -183,8 +185,8 @@ namespace vorcity_transfer {
             const auto idx_psi_Nxminus_j = ps.ij_to_rc(Nx, j, Nx - 1, j, equation, Variable::PSI  );
 
             coef_triplets.push_back(Triplet(idx_w_Nx_j.row,        idx_w_Nx_j.col,         1.0          ));
-            coef_triplets.push_back(Triplet(idx_psi_Nx_j.row,      idx_psi_Nx_j.col,       two_div_hx_sq));
-            coef_triplets.push_back(Triplet(idx_psi_Nxminus_j.row, idx_psi_Nxminus_j.col, -two_div_hx_sq));
+            coef_triplets.push_back(Triplet(idx_psi_Nx_j.row,      idx_psi_Nx_j.col,      -two_div_hx_sq));
+            coef_triplets.push_back(Triplet(idx_psi_Nxminus_j.row, idx_psi_Nxminus_j.col, +two_div_hx_sq));
         }
 
         // - Top boundary -
@@ -199,9 +201,9 @@ namespace vorcity_transfer {
             const auto idx_psi_i_Ny      = ps.ij_to_rc(i, Ny, i, Ny,     equation, Variable::PSI  );
             const auto idx_psi_i_Nyminus = ps.ij_to_rc(i, Ny, i, Ny - 1, equation, Variable::PSI  );
             
-            coef_triplets.push_back(Triplet(idx_w_i_Ny.row,         idx_w_i_Ny.col,        1.0          ));
-            coef_triplets.push_back(Triplet(idx_psi_i_Ny.row,      idx_psi_i_Ny.col,       two_div_hy_sq));
-            coef_triplets.push_back(Triplet(idx_psi_i_Nyminus.row, idx_psi_i_Nyminus.col, -two_div_hy_sq));
+            coef_triplets.push_back(Triplet(idx_w_i_Ny.row,        idx_w_i_Ny.col,         1.0          ));
+            coef_triplets.push_back(Triplet(idx_psi_i_Ny.row,      idx_psi_i_Ny.col,      -two_div_hy_sq));
+            coef_triplets.push_back(Triplet(idx_psi_i_Nyminus.row, idx_psi_i_Nyminus.col, +two_div_hy_sq));
         }
 
         // - Left boundary (no corners) -
@@ -217,8 +219,8 @@ namespace vorcity_transfer {
             const auto idx_psi_1_j = ps.ij_to_rc(0, j, 1, j, equation, Variable::PSI  );
 
             coef_triplets.push_back(Triplet(idx_w_0_j.row,   idx_w_0_j.col,    1.0          ));
-            coef_triplets.push_back(Triplet(idx_psi_0_j.row, idx_psi_0_j.col,  two_div_hx_sq));
-            coef_triplets.push_back(Triplet(idx_psi_1_j.row, idx_psi_1_j.col, -two_div_hx_sq));
+            coef_triplets.push_back(Triplet(idx_psi_0_j.row, idx_psi_0_j.col, -two_div_hx_sq));
+            coef_triplets.push_back(Triplet(idx_psi_1_j.row, idx_psi_1_j.col, +two_div_hx_sq));
             
         }
     }
@@ -278,8 +280,8 @@ namespace vorcity_transfer {
                 const auto idx_psi_P = ps.ij_to_rc(i, j, i,     j,     equation, Variable::PSI  );
                 const auto idx_psi_W = ps.ij_to_rc(i, j, i - 1, j,     equation, Variable::PSI  );
                 const auto idx_psi_E = ps.ij_to_rc(i, j, i + 1, j,     equation, Variable::PSI  );
-                const auto idx_psi_S = ps.ij_to_rc(i, j, i,     j + 1, equation, Variable::PSI  );
-                const auto idx_psi_N = ps.ij_to_rc(i, j, i,     j - 1, equation, Variable::PSI  );
+                const auto idx_psi_S = ps.ij_to_rc(i, j, i,     j - 1, equation, Variable::PSI  );
+                const auto idx_psi_N = ps.ij_to_rc(i, j, i,     j + 1, equation, Variable::PSI  );
 
                 coef_triplets.push_back(Triplet(idx_w_P.row,   idx_w_P.col,   1.0));
                 coef_triplets.push_back(Triplet(idx_psi_P.row, idx_psi_P.col, a_P));
@@ -355,5 +357,114 @@ namespace vorcity_transfer {
         const bool verbose = (ps._size < 30);
         slae_solvers::sparse_LU(coef_triplets, sol_curr, rhs, verbose);
         sol_curr.swap(sol_prev);
+    }
+
+
+    inline T integrate_value_over_G(const problem_params &ps, const Vector &values, std::function<T(T)> func) {
+        const uint Nx = ps._Nx;
+        const uint Ny = ps._Ny;
+
+        const uint size = ps._size;
+
+        // Compure epsilon = 0.5 * integral[u^2 + v^2, G]
+        T sum = 0.0;
+
+        for (uint i = 0; i <= Nx - 1; ++i) {
+            for (uint j = 0; j <= Ny - 1; ++j) {
+                const auto idx_bl = ps.ij_to_row(i, j, Equation::FIRST);
+                const auto idx_br = ps.ij_to_row(i + 1, j, Equation::FIRST);
+                const auto idx_tr = ps.ij_to_row(i + 1, j + 1, Equation::FIRST);
+                const auto idx_tl = ps.ij_to_row(i, j + 1, Equation::FIRST);
+
+                const T val_bl = values[idx_bl];
+                const T val_br = values[idx_br];
+                const T val_tr = values[idx_tr];
+                const T val_tl = values[idx_tl];
+
+                const T area = ps._hx * ps._hy;
+
+                sum += 0.5 * (func(val_bl) + func(val_br) + func(val_tr) + func(val_tl)) * area * 0.25;
+            }
+        }
+
+        return sum;
+    }
+
+
+    T get_integral_omega(const problem_params &ps, const Vector &sol) {
+        const uint size = ps._size;
+
+        // Extract omega from solution
+        Vector omega(size / 2);
+        std::copy(sol.begin(), sol.begin() + size / 2, omega.begin());
+
+        const auto identity = [](T x) -> T { return x; };
+
+        // Compute sum = integral[omega, G]
+        const T sum = integrate_value_over_G(ps, omega, identity);
+
+        // Normalize over max abs(psi)
+        /*std::sort(omega.begin(), omega.end());
+        const T max = *(omega.end() - 1);
+
+        return (max > 0.0) ? sum / max : 0.0;*/
+
+        return sum;
+    }
+
+
+    T get_integral_omega2(const problem_params &ps, const Vector &sol) {
+        const uint size = ps._size;
+
+        // Extract omega from solution
+        Vector omega(size / 2);
+        std::copy(sol.begin(), sol.begin() + size / 2, omega.begin());
+
+        const auto sqr = [](T x) -> T { return x * x; };
+
+        // Compute sum = integral[omega, G]
+        const T sum = integrate_value_over_G(ps, omega, sqr);
+
+        return sum;
+    }
+
+
+    T get_integral_dw_dt_psi(const problem_params &ps, const Vector &sol_prev, const Vector &sol_next) {
+        const uint size = ps._size;
+
+        // Extract psi, omega from solution
+        Vector psi_prev(size / 2);
+        std::copy(sol_prev.begin() + size / 2, sol_prev.end(), psi_prev.begin());
+
+        Vector psi_next(size / 2);
+        std::copy(sol_prev.begin() + size / 2, sol_prev.end(), psi_next.begin());
+
+        Vector omega_prev(size / 2);
+        std::copy(sol_prev.begin(), sol_prev.begin() + size / 2, omega_prev.begin());
+
+        Vector omega_next(size / 2);
+        std::copy(sol_next.begin(), sol_next.begin() + size / 2, omega_next.begin());
+
+        Vector dw_dt_psi(size / 2);
+        for (uint i = 0; i < size / 2; ++i)
+            dw_dt_psi[i] += (omega_next[i] - omega_prev[i]) / ps._tau * 0.5 * (psi_prev[i] + psi_next[i]);
+
+        const auto identity = [](T x) -> T { return x; };
+
+        // Compute sum = integral[omega, G]
+        const T I = integrate_value_over_G(ps, dw_dt_psi, identity);
+
+        return I;
+    }
+
+
+    T get_integral_epsilon(const problem_params &ps, const Vector &velocity_u, const Vector &velocity_v) {
+
+        // Compure epsilon = 0.5 * integral[u^2 + v^2, G]
+        const auto sqr = [](T x) -> T { return x * x; };
+
+        const T epsilon = 0.5 * (integrate_value_over_G(ps, velocity_u, sqr) + integrate_value_over_G(ps, velocity_v, sqr));
+
+        return epsilon;
     }
 }
