@@ -7,7 +7,7 @@ namespace slae_solvers {
 
 
     inline void validate_system(const Matrix &A, const Vector &solution, const Vector &rhs) {
-        const uint size = rhs.rows();
+        const size_type size = rhs.rows();
 
         const auto get_sparse_matrix_rank = [](const Matrix &matrix) -> Eigen::Index {
             Eigen::SparseQR<Matrix, Eigen::COLAMDOrdering<int>> QR_solver;
@@ -25,7 +25,7 @@ namespace slae_solvers {
     }
 
     void sparse_simplicial_cholesky(const std::vector<Triplet> &coef_triplets, Vector &solution, const Vector &rhs, bool verbose = false) {
-        const uint size = rhs.rows();
+        const size_type size = rhs.rows();
 
         // Build system matrix
         Matrix A(size, size);
@@ -43,7 +43,7 @@ namespace slae_solvers {
 
 
     void sparse_LU(const std::vector<Triplet> &coef_triplets, Vector &solution, const Vector &rhs, bool verbose = false) {
-        const uint size = rhs.rows();
+        const size_type size = rhs.rows();
         
         // Build system matrix
         Matrix A(size, size);

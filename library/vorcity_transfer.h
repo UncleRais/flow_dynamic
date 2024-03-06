@@ -11,29 +11,29 @@ namespace vorcity_transfer {
 
     void set_velocity_on_boundary(const problem_params &ps, Vector &velocity_u, Vector &velocity_v) {
         // iterations over all boundary grid nodes
-        const uint Nx = ps._Nx;
-        const uint Ny = ps._Ny;
+        const size_type Nx = ps._Nx;
+        const size_type Ny = ps._Ny;
 
         // - Bottom boundary -
-        for (uint i = 0; i <= Nx; ++i) {
+        for (size_type i = 0; i <= Nx; ++i) {
             const auto k = ps.ij_to_k(i, 0);
             velocity_u[k] = ps._boundary_velocities[0];
         }
 
         // - Right boundary -
-        for (uint j = 0; j <= Ny; ++j) { 
+        for (size_type j = 0; j <= Ny; ++j) { 
             const auto k = ps.ij_to_k(Nx, j);
             velocity_v[k] = ps._boundary_velocities[1];
         }
 
         // - Top boundary -
-        for (uint i = 0; i <= Nx; ++i) {
+        for (size_type i = 0; i <= Nx; ++i) {
             const auto k = ps.ij_to_k(i, Ny);
             velocity_u[k] = ps._boundary_velocities[2];
         }
 
         // - Left boundary -
-        for (uint j = 0; j <= Ny; ++j) {
+        for (size_type j = 0; j <= Ny; ++j) {
             const auto k = ps.ij_to_k(0, j);
             velocity_v[k] = ps._boundary_velocities[3];
         }    
@@ -42,15 +42,15 @@ namespace vorcity_transfer {
 
     void calc_velocity_on_vertices(const problem_params& ps, const Vector& sol_prev, Vector& velocity_u, Vector& velocity_v) {
         // --- Internal vertices ---
-        const uint Nx = ps._Nx;
-        const uint Ny = ps._Ny;
+        const size_type Nx = ps._Nx;
+        const size_type Ny = ps._Ny;
 
         const T half_of_div_hx = 0.5 / ps._hx;
         const T half_of_div_hy = 0.5 / ps._hy;
 
-        for (uint i = 1; i <= Nx - 1; ++i) {
-            for (uint j = 1; j <= Ny - 1; ++j) {
-                const uint k = ps.ij_to_k(i, j);
+        for (size_type i = 1; i <= Nx - 1; ++i) {
+            for (size_type j = 1; j <= Ny - 1; ++j) {
+                const size_type k = ps.ij_to_k(i, j);
 
                 const T psi_iplus_j  = sol_prev[ps.ij_to_row(i + 1, j,     Equation::SECOND)];
                 const T psi_iminus_j = sol_prev[ps.ij_to_row(i - 1, j,     Equation::SECOND)];
@@ -97,10 +97,10 @@ namespace vorcity_transfer {
     ) {
         const auto equation = Equation::FIRST; // => filling the top half of the matrix
 
-        const uint Nx      = ps._Nx;
-        const uint Ny      = ps._Ny;
-        const uint count_x = ps._count_x;
-        const uint count_y = ps._count_y;
+        const size_type Nx      = ps._Nx;
+        const size_type Ny      = ps._Ny;
+        const size_type count_x = ps._count_x;
+        const size_type count_y = ps._count_y;
 
         const T div_tau = 1.0 / ps._tau;
         const T div_hx  = 1.0 / ps._hx;
@@ -115,8 +115,8 @@ namespace vorcity_transfer {
         // --- Internal vertices ---
         // Iterate regular 'cross-shaped' template
 
-        for (uint i = 1; i <= Nx - 1; ++i) {
-            for (uint j = 1; j <= Ny - 1; ++j) {
+        for (size_type i = 1; i <= Nx - 1; ++i) {
+            for (size_type j = 1; j <= Ny - 1; ++j) {
                 // Fill RHS
                 const auto row = ps.ij_to_row(i, j, equation);
 
@@ -156,7 +156,7 @@ namespace vorcity_transfer {
             // 'BVI' means 'Boundary Velocity Impact', refers to a Thom condition term that includes boundary velocity
 
         // - Bottom boundary -
-        for (uint i = 0; i <= Nx; ++i) {
+        for (size_type i = 0; i <= Nx; ++i) {
             // Fill RHS
             const auto row = ps.ij_to_row(i, 0, equation);
 
@@ -173,7 +173,7 @@ namespace vorcity_transfer {
         }
 
         // - Right boundary (no corners) -
-        for (uint j = 1; j <= Ny - 1; ++j) {
+        for (size_type j = 1; j <= Ny - 1; ++j) {
             // Fill RHS
             const auto row = ps.ij_to_row(Nx, j, equation);
 
@@ -190,7 +190,7 @@ namespace vorcity_transfer {
         }
 
         // - Top boundary -
-        for (uint i = 0; i <= Nx; ++i) {
+        for (size_type i = 0; i <= Nx; ++i) {
             // Fill RHS
             const auto row = ps.ij_to_row(i, Ny, equation);
 
@@ -207,7 +207,7 @@ namespace vorcity_transfer {
         }
 
         // - Left boundary (no corners) -
-        for (uint j = 1; j <= Ny - 1; ++j) {
+        for (size_type j = 1; j <= Ny - 1; ++j) {
             // Fill RHS
             const auto row = ps.ij_to_row(0, j, equation);
 
@@ -248,10 +248,10 @@ namespace vorcity_transfer {
     ) {
         const auto equation = Equation::SECOND; // => filling the bottom half of the matrix
 
-        const uint Nx      = ps._Nx;
-        const uint Ny      = ps._Ny;
-        const uint count_x = ps._count_x;
-        const uint count_y = ps._count_y;
+        const size_type Nx      = ps._Nx;
+        const size_type Ny      = ps._Ny;
+        const size_type count_x = ps._count_x;
+        const size_type count_y = ps._count_y;
 
         const T div_hx = 1.0 / ps._hx;
         const T div_hy = 1.0 / ps._hy;
@@ -268,8 +268,8 @@ namespace vorcity_transfer {
         // --- Internal vertices ---
         // Iterate regular 'cross-shaped' template
 
-        for (uint i = 1; i <= Nx - 1; ++i) {
-            for (uint j = 1; j <= Ny - 1; ++j) {
+        for (size_type i = 1; i <= Nx - 1; ++i) {
+            for (size_type j = 1; j <= Ny - 1; ++j) {
                 // Fill RHS
                 const auto row = ps.ij_to_row(i, j, equation);
 
@@ -296,7 +296,7 @@ namespace vorcity_transfer {
         // Apply zero-boundary condition: { psi  |boundary  = 0
         
         // - Bottom boundary -
-        for (uint i = 0; i <= Nx; ++i) {
+        for (size_type i = 0; i <= Nx; ++i) {
             // Fill RHS
             // < always stays zero, no need to fill every time >
 
@@ -307,7 +307,7 @@ namespace vorcity_transfer {
         }
 
         // - Right boundary (no corners) -
-        for (uint j = 1; j <= Ny - 1; ++j) {
+        for (size_type j = 1; j <= Ny - 1; ++j) {
             // Fill RHS
             // < always stays zero, no need to fill every time >
 
@@ -318,7 +318,7 @@ namespace vorcity_transfer {
         }
 
         // - Top boundary -
-        for (uint i = 0; i <= Nx; ++i) {
+        for (size_type i = 0; i <= Nx; ++i) {
             // Fill RHS
             // < always stays zero, no need to fill every time >
 
@@ -329,7 +329,7 @@ namespace vorcity_transfer {
         }
 
         // - Left boundary (no corners) -
-        for (uint j = 1; j <= Ny - 1; ++j) {
+        for (size_type j = 1; j <= Ny - 1; ++j) {
             // Fill RHS
             // < always stays zero, no need to fill every time >
 
@@ -361,16 +361,16 @@ namespace vorcity_transfer {
 
 
     inline T integrate_value_over_G(const problem_params &ps, const Vector &values, std::function<T(T)> func) {
-        const uint Nx = ps._Nx;
-        const uint Ny = ps._Ny;
+        const size_type Nx = ps._Nx;
+        const size_type Ny = ps._Ny;
 
-        const uint size = ps._size;
+        const size_type size = ps._size;
 
         // Compure epsilon = 0.5 * integral[u^2 + v^2, G]
         T sum = 0.0;
 
-        for (uint i = 0; i <= Nx - 1; ++i) {
-            for (uint j = 0; j <= Ny - 1; ++j) {
+        for (size_type i = 0; i <= Nx - 1; ++i) {
+            for (size_type j = 0; j <= Ny - 1; ++j) {
                 const auto idx_bl = ps.ij_to_row(i, j, Equation::FIRST);
                 const auto idx_br = ps.ij_to_row(i + 1, j, Equation::FIRST);
                 const auto idx_tr = ps.ij_to_row(i + 1, j + 1, Equation::FIRST);
@@ -392,7 +392,7 @@ namespace vorcity_transfer {
 
 
     T get_integral_omega(const problem_params &ps, const Vector &sol) {
-        const uint size = ps._size;
+        const size_type size = ps._size;
 
         // Extract omega from solution
         Vector omega(size / 2);
@@ -414,7 +414,7 @@ namespace vorcity_transfer {
 
 
     T get_integral_omega2(const problem_params &ps, const Vector &sol) {
-        const uint size = ps._size;
+        const size_type size = ps._size;
 
         // Extract omega from solution
         Vector omega(size / 2);
@@ -430,7 +430,7 @@ namespace vorcity_transfer {
 
 
     T get_integral_dw_dt_psi(const problem_params &ps, const Vector &sol_prev, const Vector &sol_next) {
-        const uint size = ps._size;
+        const size_type size = ps._size;
 
         // Extract psi, omega from solution
         Vector psi_prev(size / 2);
@@ -446,7 +446,7 @@ namespace vorcity_transfer {
         std::copy(sol_next.begin(), sol_next.begin() + size / 2, omega_next.begin());
 
         Vector dw_dt_psi(size / 2);
-        for (uint i = 0; i < size / 2; ++i)
+        for (size_type i = 0; i < size / 2; ++i)
             dw_dt_psi[i] += (omega_next[i] - omega_prev[i]) / ps._tau * 0.5 * (psi_prev[i] + psi_next[i]);
 
         const auto identity = [](T x) -> T { return x; };

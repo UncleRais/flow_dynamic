@@ -1,11 +1,11 @@
 #include "library/vorcity_transfer.h"
 #include "library/thermal_conductivity.h"
-#include "library/proto_utils.hpp" /// ?
+#include "library/proto_utils.hpp" 
 
 
 Vector solve(const problem_params &ps) {
-    const uint size        = ps._size;
-    const uint time_steps = ps._steps;
+    const size_type size        = ps._size;
+    const size_type time_steps = ps._steps;
 
     Vector rhs        = Vector::Zero(size);
     Vector sol_prev   = Vector::Zero(size);
@@ -22,16 +22,20 @@ Vector solve(const problem_params &ps) {
     // The choise of initial 'T' introduces disturbance to the system => vorcity
     vorcity_transfer::set_velocity_on_boundary(ps, velocity_u, velocity_v);
 
-    std::ofstream log("log_integrals.txt");
+    std::ofstream log(ps.add_folder("log_integrals.txt"));
 
     utl::progressbar::Percentage bar;
     bar.start();
 
     utl::timer::start();
+    const auto filename = ps.add_folder("result_");
+
+    ps.export_results(sol_prev, velocity_u, velocity_v, filename + ps.str_i(0));
 
     // Iterate over time
-    for (uint step = 0; step < time_steps; ++step) {
+    for (size_type step = 0; step < time_steps; ++step) {
         vorcity_transfer::solve(ps, sol_curr, sol_prev, velocity_u, velocity_v, rhs);
+        ps.export_results(sol_prev, velocity_u, velocity_v, filename + ps.str_i(step + 1));
 
         // Export integrals related to conservation laws
         constexpr std::streamsize width = 16;
@@ -44,31 +48,26 @@ Vector solve(const problem_params &ps) {
 
         bar.set_progress(static_cast<double>(step) / time_steps);
     }
-
+    ps.export_vtu_series("timesteps");
     bar.finish();
-
     std::cout << "Completed in " << utl::timer::elapsed_string_fullform() << std::endl;
-
     utl::timer::start();
-
-    ps.export_results(sol_prev, velocity_u, velocity_v);
-
     std::cout << "Exported in " << utl::timer::elapsed_string_fullform() << std::endl;
 
     return sol_curr;
 }
 
 int main(int argc, char** argv) {
-    constexpr uint Nx = 100;
-    constexpr uint Ny = 100;
-    constexpr uint steps = 20;
-    constexpr T L = 1.0;
-    constexpr T H = 1.0;
-    constexpr T time = 1.0;
-    constexpr T nu = 1.0e6; // water: 1.787e6
+    constexpr size_type Nx = 100;
+    constexpr size_type Ny = 100;
+    constexpr size_type steps = 200;
+    constexpr T L = 2.0;
+    constexpr T H = 2.0;
+    constexpr T time = 2.0;
+    constexpr T nu = 1e-3; // water: 1.787e6
     constexpr std::array<T, 4> boundary_velocities = { 0.0, 0.0, -1.0, -0.0 };
     constexpr auto filename = "result";
-    constexpr auto format = SaveFormat::RAW;
+    constexpr auto format = SaveFormat::VTU;
 
     const problem_params params(Nx, Ny, steps, L, H, time, nu, boundary_velocities, filename, format);
 
