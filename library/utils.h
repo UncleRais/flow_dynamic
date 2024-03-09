@@ -81,7 +81,7 @@ struct problem_params {
         size_type Nx, size_type Ny, size_type steps,
         T L, T H, T time,
         T nu, 
-        std::array<T, 4> BC_velocity,
+        std::array<T, 4> boundary_velocities,
         std::string_view filename,
         SaveFormat format
     ): 
@@ -89,7 +89,7 @@ struct problem_params {
         _Nx(Nx), _Ny(Ny), _steps(steps),
         _L(L), _H(H), _time(time),
         _nu(nu),
-        _boundary_velocities{BC_velocity},
+        _boundary_velocities{boundary_velocities},
         _filename(filename),
         _format(format)
     {
@@ -356,14 +356,3 @@ std::ostream& operator<<(std::ostream &cout, const Vector &vec) {
 
     return cout;
 }
-
-void build_test_problem(std::vector<Triplet> &coefficients, Eigen::VectorXd &b, size_type n){
-    for (size_type i = 0; i < n; ++i) {
-        b[i] = 0.0001;
-        for (size_type j = 0; j < n; ++j) 
-            if(i == j) {
-                const T val = (j + 1) / 1000.0;
-                coefficients.push_back(Triplet(i, j, val));
-            };
-    };
-};
