@@ -20,10 +20,10 @@ namespace test {
 
         for (size_type i = 0; i <= Nx - 1; ++i) {
             for (size_type j = 0; j <= Ny - 1; ++j) {
-                const auto idx_bl = ps.ij_to_row(i,     j,     Equation::FIRST);
-                const auto idx_br = ps.ij_to_row(i + 1, j,     Equation::FIRST);
-                const auto idx_tr = ps.ij_to_row(i + 1, j + 1, Equation::FIRST);
-                const auto idx_tl = ps.ij_to_row(i,     j + 1, Equation::FIRST);
+                const auto idx_bl = ps.ij_to_k(i,     j    );
+                const auto idx_br = ps.ij_to_k(i + 1, j    );
+                const auto idx_tr = ps.ij_to_k(i + 1, j + 1);
+                const auto idx_tl = ps.ij_to_k(i,     j + 1);
 
                 const T val_bl = values[idx_bl];
                 const T val_br = values[idx_br];
@@ -54,7 +54,7 @@ namespace test {
     }
 
 
-    T get_integral_omega2(const problem_params &ps, const Vector &sol) {
+    inline T get_integral_omega2(const problem_params &ps, const Vector &sol) {
         const size_type half_size = ps._size / 2;
 
         // Extract omega from solution
@@ -70,7 +70,7 @@ namespace test {
     }
 
 
-    T get_integral_dw_dt_psi(const problem_params &ps, const Vector &sol_prev, const Vector &sol_next) {
+    inline T get_integral_dw_dt_psi(const problem_params &ps, const Vector &sol_prev, const Vector &sol_next) {
         const size_type half_size = ps._size / 2;
 
         // Extract psi, omega from solution
@@ -99,7 +99,7 @@ namespace test {
     }
 
 
-    T get_integral_epsilon(const problem_params &ps, const Vector &velocity_u, const Vector &velocity_v) {
+    inline T get_integral_epsilon(const problem_params &ps, const Vector &velocity_u, const Vector &velocity_v) {
 
         // Compure epsilon = 0.5 * integral[u^2 + v^2, G]
         const auto sqr = [](T x) -> T { return x * x; };
@@ -109,7 +109,7 @@ namespace test {
         return epsilon;
     }
 
-    void build_test_problem(std::vector<Triplet> &coefficients, Eigen::VectorXd &b, size_type n){
+    inline void build_test_problem(std::vector<Triplet> &coefficients, Eigen::VectorXd &b, size_type n){
     for (size_type i = 0; i < n; ++i) {
         b[i] = 0.0001;
         for (size_type j = 0; j < n; ++j) 

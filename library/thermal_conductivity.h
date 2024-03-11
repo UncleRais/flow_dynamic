@@ -5,11 +5,11 @@
 
 
 namespace thermal_conductivity {
-    void build_system() {
+    inline void build_system() {
 
     }
 
-    void solve() {
+    inline void solve() {
 
     }
 }

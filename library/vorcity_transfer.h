@@ -9,7 +9,7 @@
 namespace vorcity_transfer {
 
 
-    void set_velocity_on_boundary(const problem_params &ps, Vector &velocity_u, Vector &velocity_v) {
+    inline void set_velocity_on_boundary(const problem_params &ps, Vector &velocity_u, Vector &velocity_v) {
         // iterations over all boundary grid nodes
         const size_type Nx = ps._Nx;
         const size_type Ny = ps._Ny;
@@ -44,7 +44,7 @@ namespace vorcity_transfer {
     }
 
 
-    void calc_velocity_on_vertices(const problem_params& ps, const Vector& sol_prev, Vector& velocity_u, Vector& velocity_v) {
+    inline void calc_velocity_on_vertices(const problem_params& ps, const Vector& sol_prev, Vector& velocity_u, Vector& velocity_v) {
         // --- Internal vertices ---
         const size_type Nx = ps._Nx;
         const size_type Ny = ps._Ny;
@@ -56,10 +56,10 @@ namespace vorcity_transfer {
             for (size_type j = 1; j <= Ny - 1; ++j) {
                 const size_type k = ps.ij_to_k(i, j);
 
-                const T psi_iplus_j  = sol_prev[ps.ij_to_row(i + 1, j,     Equation::SECOND)];
-                const T psi_iminus_j = sol_prev[ps.ij_to_row(i - 1, j,     Equation::SECOND)];
-                const T psi_i_jplus  = sol_prev[ps.ij_to_row(i,     j + 1, Equation::SECOND)];
-                const T psi_i_jminus = sol_prev[ps.ij_to_row(i,     j - 1, Equation::SECOND)];
+                const T psi_iplus_j  = sol_prev[ps.ij_to_sol_row(i + 1, j,     Variable::PSI)];
+                const T psi_iminus_j = sol_prev[ps.ij_to_sol_row(i - 1, j,     Variable::PSI)];
+                const T psi_i_jplus  = sol_prev[ps.ij_to_sol_row(i,     j + 1, Variable::PSI)];
+                const T psi_i_jminus = sol_prev[ps.ij_to_sol_row(i,     j - 1, Variable::PSI)];
 
                 velocity_u[k] =  half_of_div_hy * (psi_i_jplus - psi_i_jminus);
                 velocity_v[k] = -half_of_div_hx * (psi_iplus_j - psi_iminus_j);
@@ -92,7 +92,7 @@ namespace vorcity_transfer {
     // While iterating we use .ij_to_rc() and .it_to_rhs_row() methods to automatically
     // compute 'row' & 'col' matrix indexation corresponding to each term of the template
     //
-    void build_system_transfer(
+    inline void build_system_transfer(
         const problem_params &ps,
         std::vector<Triplet> &coef_triplets,
         const Vector &sol_prev,
@@ -122,7 +122,7 @@ namespace vorcity_transfer {
         for (size_type i = 1; i <= Nx - 1; ++i) {
             for (size_type j = 1; j <= Ny - 1; ++j) {
                 // Fill RHS
-                const auto row = ps.ij_to_row(i, j, equation);
+                const auto row = ps.ij_to_rhs_row(i, j, equation);
 
                 rhs[row] = div_tau * sol_prev[row]; /// Temperature impact will be added here
 
@@ -162,7 +162,7 @@ namespace vorcity_transfer {
         // - Bottom boundary -
         for (size_type i = 0; i <= Nx; ++i) {
             // Fill RHS
-            const auto row = ps.ij_to_row(i, 0, equation);
+            const auto row = ps.ij_to_rhs_row(i, 0, equation);
 
             rhs[row] = BVI_bottom;
 
@@ -179,7 +179,7 @@ namespace vorcity_transfer {
         // - Right boundary (no corners) -
         for (size_type j = 1; j <= Ny - 1; ++j) {
             // Fill RHS
-            const auto row = ps.ij_to_row(Nx, j, equation);
+            const auto row = ps.ij_to_rhs_row(Nx, j, equation);
 
             rhs[row] = BVI_right;
 
@@ -196,7 +196,7 @@ namespace vorcity_transfer {
         // - Top boundary -
         for (size_type i = 0; i <= Nx; ++i) {
             // Fill RHS
-            const auto row = ps.ij_to_row(i, Ny, equation);
+            const auto row = ps.ij_to_rhs_row(i, Ny, equation);
 
             rhs[row] = BVI_top; 
 
@@ -213,7 +213,7 @@ namespace vorcity_transfer {
         // - Left boundary (no corners) -
         for (size_type j = 1; j <= Ny - 1; ++j) {
             // Fill RHS
-            const auto row = ps.ij_to_row(0, j, equation);
+            const auto row = ps.ij_to_rhs_row(0, j, equation);
 
             rhs[row] = BVI_left;
 
@@ -243,7 +243,7 @@ namespace vorcity_transfer {
     // Template equation:
     // w_P  +  a_P * psi_P  +  a_W * psi_W  +  a_E * psi_E  +  a_S * psi_S  + a_N * psi_N = 0
     //
-    void build_system_laplace(
+    inline void build_system_laplace(
         const problem_params &ps,
         std::vector<Triplet> &coef_triplets,
         const Vector &sol_prev,
@@ -275,7 +275,7 @@ namespace vorcity_transfer {
         for (size_type i = 1; i <= Nx - 1; ++i) {
             for (size_type j = 1; j <= Ny - 1; ++j) {
                 // Fill RHS
-                const auto row = ps.ij_to_row(i, j, equation);
+                const auto row = ps.ij_to_rhs_row(i, j, equation);
 
                 rhs[row] = 0.0;
 
@@ -344,7 +344,7 @@ namespace vorcity_transfer {
     }
 
 
-    void solve (
+    inline void solve (
         const problem_params &ps,
         Vector &sol_prev,   Vector &sol_curr,
         Vector &velocity_u, Vector &velocity_v,
@@ -359,7 +359,23 @@ namespace vorcity_transfer {
         build_system_laplace (ps, coef_triplets, sol_prev, velocity_u, velocity_v, rhs);
 
         const bool verbose = (ps._size < 30);
-        slae_solvers::sparse_LU(coef_triplets, sol_curr, rhs, verbose);
+        const auto &method = ps._method;
+
+        //const slae::Method method = slae::DecompositionMethod::SPARSE_LU;
+        //const Method method = IterativeMethodData{ IterativeMethod::BI_CGSTAB, 1e-4, 200, sol_prev };
+
+        // Reroute SLAE args to decomposition or iterative solver
+        if (std::holds_alternative<DecompositionMethod>(method)) {
+            const auto &decomp_method = std::get<DecompositionMethod>(method);
+
+            slae::sparse_solve_decomposition(coef_triplets, sol_curr, rhs, decomp_method, verbose);
+        }
+        if (std::holds_alternative<IterativeMethodData>(method)) {
+            const auto &iterative_method_data = std::get<IterativeMethodData>(method);
+
+            slae::sparse_solve_iterative(coef_triplets, sol_curr, rhs, iterative_method_data, &sol_prev, verbose);
+        }
+
         sol_curr.swap(sol_prev);
     }
 

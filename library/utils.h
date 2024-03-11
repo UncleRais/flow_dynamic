@@ -5,6 +5,7 @@
 #include <string>
 #include <iomanip>
 #include <optional>
+#include <variant>
 
 #include <omp.h>
 
@@ -15,8 +16,8 @@
 
 
 using T         = double;
-using size_type = std::size_t;
-using Matrix    = Eigen::SparseMatrix<T>;
+using size_type = int;
+using Matrix    = Eigen::SparseMatrix<T/*, Eigen::RowMajor*/>; /// for some reason row-major storage causes crashed for large N
 using Vector    = Eigen::VectorXd;
 using Triplet   = Eigen::Triplet<T>;
 
@@ -25,6 +26,7 @@ struct MatrixIndex {
     size_type col;
 };
 
+// Indexation-related enums
 enum class Equation : size_type {
     FIRST = 0,
     SECOND = 1
@@ -35,6 +37,27 @@ enum class Variable : size_type {
     PSI = 1
 };
 
+// SLAE enums
+enum class DecompositionMethod {
+    SPARSE_LU,
+    SPARSE_QR,
+    SIMPLICIAL_CHOLESKY
+};
+
+enum class IterativeMethod {
+    LS_CONJUGATE_GRADIENT,
+    BI_CGSTAB
+};
+
+struct IterativeMethodData {
+    IterativeMethod                               method;
+    std::optional<T>                              tolerance      = std::nullopt; // default: ~2.2e-16
+    std::optional<Eigen::Index>                   max_iterations = std::nullopt; // default:  2 * matrix_size
+};
+
+using Method = std::variant<DecompositionMethod, IterativeMethodData>;
+
+// Format enums
 enum class SaveFormat {
     RAW,
     VTU
@@ -62,6 +85,8 @@ struct problem_params {
     T _nu;
     std::array<T, 4> _boundary_velocities;
 
+    Method _method;
+
     std::string _filename;
     std::string _folder = "results";
     SaveFormat _format;
@@ -82,6 +107,7 @@ struct problem_params {
         T L, T H, T time,
         T nu, 
         std::array<T, 4> boundary_velocities,
+        Method method,
         std::string_view filename,
         SaveFormat format
     ): 
@@ -89,7 +115,8 @@ struct problem_params {
         _Nx(Nx), _Ny(Ny), _steps(steps),
         _L(L), _H(H), _time(time),
         _nu(nu),
-        _boundary_velocities{boundary_velocities},
+        _boundary_velocities(boundary_velocities),
+        _method(method),
         _filename(filename),
         _format(format)
     {
@@ -113,7 +140,7 @@ struct problem_params {
     }
 
     // mesh indexation convertation to matrix indexation
-    MatrixIndex ij_to_rc(
+    inline MatrixIndex ij_to_rc(
         size_type template_i,   size_type template_j,
         size_type term_i,       size_type term_j, 
         Equation equation,      Variable variable
@@ -127,7 +154,7 @@ struct problem_params {
         return MatrixIndex{ row, col };
     }
 
-    size_type ij_to_row(
+    inline size_type ij_to_rhs_row(
         size_type template_i, size_type template_j,
         Equation equation
     ) const {
@@ -137,26 +164,40 @@ struct problem_params {
         return row;
     }
 
-    std::string add_folder(std::string filename) const {
+    inline size_type ij_to_sol_row(
+        size_type template_i, size_type template_j,
+        Variable variable
+    ) const {
+        // Row corresponds to the 'k' of main template vertex
+        const size_type row = ij_to_k(template_i, template_j) + static_cast<size_type>(variable) * _count_k;
+
+        return row;
+    }
+
+    inline std::string get_relative_path(std::string filename) const {
         return _folder + "/" + filename;
     }
 
-    std::string str_i (size_type i) const {
+    inline std::string str_i (size_type i) const {
         std::string str_i = std::to_string(i);
         while (str_i.size() < 6) str_i = "0" + str_i;
         return str_i;
     };
    
-    void set_output_directory() const {
+    inline void set_output_directory() const {
         std::filesystem::path path = "./" + _folder;
         if(!std::filesystem::is_directory(path))
             std::filesystem::create_directory(path);
         assert(std::filesystem::is_directory(path));
     }
 
-    void export_results(const Vector &sol_prev, const Vector &velocity_u, const Vector &velocity_v, 
-                        std::optional<std::string> filename) const {
+    inline void export_results(
+        const Vector &sol_prev,
+        const Vector &velocity_u, const Vector &velocity_v, 
+        std::optional<std::string> filename = std::nullopt
+    ) const {
         if (!filename) *filename = _filename; 
+
         if (_format == SaveFormat::VTU) {
             this->export_results_as_vtu(sol_prev, velocity_u, velocity_v, filename);
         }
@@ -168,7 +209,7 @@ struct problem_params {
         }
     }
 
-    void export_results_as_raw(const Vector &sol_prev, const Vector &velocity_u, const Vector &velocity_v) const {
+    inline void export_results_as_raw(const Vector &sol_prev, const Vector &velocity_u, const Vector &velocity_v) const {
         constexpr auto extension = ".txt";
         constexpr auto error     = "Could not create file.";
         constexpr std::streamsize width = 20;
@@ -199,7 +240,7 @@ struct problem_params {
         for (size_type i = 0; i <= _Nx; ++i)
             for (size_type j = 0; j <= _Ny; ++j)
                 file
-                    << std::setw(width) << sol_prev[ij_to_row(i, j, Equation::FIRST)]
+                    << std::setw(width) << sol_prev[ij_to_sol_row(i, j, Variable::OMEGA)]
                     << std::endl;
 
         file.close();
@@ -211,7 +252,7 @@ struct problem_params {
         for (size_type i = 0; i <= _Nx; ++i)
             for (size_type j = 0; j <= _Ny; ++j)
                 file
-                << std::setw(width) << sol_prev[ij_to_row(i, j, Equation::SECOND)]
+                << std::setw(width) << sol_prev[ij_to_sol_row(i, j, Variable::PSI)]
                 << std::endl;
 
         file.close();
@@ -230,7 +271,7 @@ struct problem_params {
         file.close();
     }
 
-    void export_results_as_vtu(const Vector &sol_prev, const Vector &velocity_u, const Vector &velocity_v, 
+    inline void export_results_as_vtu(const Vector &sol_prev, const Vector &velocity_u, const Vector &velocity_v,
                                std::optional<std::string> filename) const {
 
         std::vector<T> points;
@@ -301,15 +342,15 @@ struct problem_params {
         }
     }
 
-    void export_vtu_series(std::string filename) const {
-        std::ofstream log(add_folder(filename) + ".vtu.series");
+    inline void export_vtu_series_metadata(std::string filename) const {
+        std::ofstream log(get_relative_path(filename) + ".vtu.series");
         const std::string tab("  ");
         const std::string _2tab(tab + tab);
 
         log << "{" << std::endl;
         log << tab + "\"file-series-version\" : \"1.0\"," << std::endl; 
         log << tab + "  \"files\" : [" << std::endl;
-        for (size_type k; k < _steps; ++k)
+        for (size_type k = 0; k < _steps; ++k)
             log << _2tab + "{ \"name\" : \"result_" << str_i(k) << ".vtu\", \"time\" : " << k * _tau << " }," << std::endl;
         log << _2tab + "{ \"name\" : \"result_" << str_i(_steps) << ".vtu\", \"time\" : " << _steps * _tau << " }" << std::endl;
         log << "  ]" << std::endl;
@@ -317,8 +358,8 @@ struct problem_params {
     }
 };
 
-std::string system_as_string(const Matrix &A, const Vector &rhs) {
-    const size_type size = A.rows();
+inline std::string system_as_string(const Matrix &A, const Vector &rhs) {
+    const auto size = A.rows();
 
     assert(size == A.rows());
     assert(size == A.cols());
@@ -348,7 +389,7 @@ std::string system_as_string(const Matrix &A, const Vector &rhs) {
     return ss.str();
 }
 
-std::ostream& operator<<(std::ostream &cout, const Vector &vec) {
+inline std::ostream& operator<<(std::ostream &cout, const Vector &vec) {
     
     std::cout << "{ ";
     for (const auto &el: vec) std::cout << el << ", ";
