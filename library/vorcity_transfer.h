@@ -106,15 +106,25 @@ namespace vorcity_transfer {
         const size_type count_x = ps._count_x;
         const size_type count_y = ps._count_y;
 
-        const T div_tau = 1.0 / ps._tau;
-        const T div_hx  = 1.0 / ps._hx;
-        const T div_hy  = 1.0 / ps._hy;
+        // const T div_tau = 1.0 / ps._tau;
+        // const T div_hx  = 1.0 / ps._hx;
+        // const T div_hy  = 1.0 / ps._hy;
 
-        const T div_hx2 = div_hx * div_hx;
-        const T div_hy2 = div_hy * div_hy;
+        // const T div_hx2 = div_hx * div_hx;
+        // const T div_hy2 = div_hy * div_hy;
 
-        const T nu_div_hx2 = ps._nu * div_hx2;
-        const T nu_div_hy2 = ps._nu * div_hy2;
+        const T hx2 = ps._hx * ps._hx;
+        const T hy2 = ps._hy * ps._hy;
+
+        const T nu_hx2 = ps._nu * hx2;
+        const T nu_hy2 = ps._nu * hy2;
+
+        const T hx2_hy2 = hx2 * hy2;
+        const T hx_hy2 = ps._hx * hy2;
+        const T hx2_hy = hx2 * ps._hy;
+
+        // const T nu_div_hx2 = ps._nu * div_hx2;
+        // const T nu_div_hy2 = ps._nu * div_hy2;
 
         // --- Internal vertices ---
         // Iterate regular 'cross-shaped' template
@@ -124,7 +134,7 @@ namespace vorcity_transfer {
                 // Fill RHS
                 const auto row = ps.ij_to_rhs_row(i, j, equation);
 
-                rhs[row] = div_tau * sol_prev[row]; /// Temperature impact will be added here
+                rhs[row] = hx2_hy2 * sol_prev[row]; /// Temperature impact will be added here
 
                 // Fill Matrix
                 const auto idx_w_P = ps.ij_to_rc(i, j, i,     j,     equation, Variable::OMEGA);
@@ -133,11 +143,11 @@ namespace vorcity_transfer {
                 const auto idx_w_S = ps.ij_to_rc(i, j, i,     j - 1, equation, Variable::OMEGA);
                 const auto idx_w_N = ps.ij_to_rc(i, j, i,     j + 1, equation, Variable::OMEGA);
 
-                const T a_P = div_tau + 2.0 * (nu_div_hx2 + nu_div_hy2);
-                const T a_W = -0.5 * div_hx * velocity_u[ps.ij_to_k(i - 1, j    )] - nu_div_hx2;
-                const T a_E =  0.5 * div_hx * velocity_u[ps.ij_to_k(i + 1, j    )] - nu_div_hx2;
-                const T a_S = -0.5 * div_hy * velocity_v[ps.ij_to_k(i,     j - 1)] - nu_div_hy2;
-                const T a_N =  0.5 * div_hy * velocity_v[ps.ij_to_k(i,     j + 1)] - nu_div_hy2;
+                const T a_P = hx2_hy2 + 2.0 * (nu_hx2 + nu_hy2);
+                const T a_W = -0.5 * hx_hy2 * velocity_u[ps.ij_to_k(i - 1, j    )] - nu_hy2;
+                const T a_E =  0.5 * hx_hy2 * velocity_u[ps.ij_to_k(i + 1, j    )] - nu_hy2;
+                const T a_S = -0.5 * hx2_hy * velocity_v[ps.ij_to_k(i,     j - 1)] - nu_hx2;
+                const T a_N =  0.5 * hx2_hy * velocity_v[ps.ij_to_k(i,     j + 1)] - nu_hx2;
 
                 coef_triplets.push_back(Triplet(idx_w_P.row, idx_w_P.col, a_P));
                 coef_triplets.push_back(Triplet(idx_w_W.row, idx_w_W.col, a_W));
@@ -150,13 +160,10 @@ namespace vorcity_transfer {
         // --- Boundary vertices ---
         // Apply Thom conditions
 
-        const T two_div_hx_sq = 2.0 * div_hx2;
-        const T two_div_hy_sq = 2.0 * div_hy2;
-
-        const T BVI_bottom =  2.0 * div_hx * ps._boundary_velocities[0];
-        const T BVI_right  =  2.0 * div_hy * ps._boundary_velocities[1];
-        const T BVI_top    = -2.0 * div_hx * ps._boundary_velocities[2];
-        const T BVI_left   = -2.0 * div_hy * ps._boundary_velocities[3];
+        const T BVI_bottom =  2.0 * ps._hx * ps._boundary_velocities[0];
+        const T BVI_right  =  2.0 * ps._hy * ps._boundary_velocities[1];
+        const T BVI_top    = -2.0 * ps._hx * ps._boundary_velocities[2];
+        const T BVI_left   = -2.0 * ps._hy * ps._boundary_velocities[3];
             // 'BVI' means 'Boundary Velocity Impact', refers to a Thom condition term that includes boundary velocity
 
         // - Bottom boundary -
@@ -171,9 +178,9 @@ namespace vorcity_transfer {
             const auto idx_psi_i_0 = ps.ij_to_rc(i, 0, i, 0, equation, Variable::PSI  );
             const auto idx_psi_i_1 = ps.ij_to_rc(i, 0, i, 1, equation, Variable::PSI  );
 
-            coef_triplets.push_back(Triplet(idx_w_i_0.row,   idx_w_i_0.col,    1.0          ));
-            coef_triplets.push_back(Triplet(idx_psi_i_0.row, idx_psi_i_0.col, -two_div_hy_sq));
-            coef_triplets.push_back(Triplet(idx_psi_i_1.row, idx_psi_i_1.col, +two_div_hy_sq));
+            coef_triplets.push_back(Triplet(idx_w_i_0.row,   idx_w_i_0.col,    hy2));
+            coef_triplets.push_back(Triplet(idx_psi_i_0.row, idx_psi_i_0.col, -2.0));
+            coef_triplets.push_back(Triplet(idx_psi_i_1.row, idx_psi_i_1.col, +2.0));
         }
 
         // - Right boundary (no corners) -
@@ -188,9 +195,9 @@ namespace vorcity_transfer {
             const auto idx_psi_Nx_j      = ps.ij_to_rc(Nx, j, Nx,     j, equation, Variable::PSI  );
             const auto idx_psi_Nxminus_j = ps.ij_to_rc(Nx, j, Nx - 1, j, equation, Variable::PSI  );
 
-            coef_triplets.push_back(Triplet(idx_w_Nx_j.row,        idx_w_Nx_j.col,         1.0          ));
-            coef_triplets.push_back(Triplet(idx_psi_Nx_j.row,      idx_psi_Nx_j.col,      -two_div_hx_sq));
-            coef_triplets.push_back(Triplet(idx_psi_Nxminus_j.row, idx_psi_Nxminus_j.col, +two_div_hx_sq));
+            coef_triplets.push_back(Triplet(idx_w_Nx_j.row,        idx_w_Nx_j.col,         hx2));
+            coef_triplets.push_back(Triplet(idx_psi_Nx_j.row,      idx_psi_Nx_j.col,      -2.0));
+            coef_triplets.push_back(Triplet(idx_psi_Nxminus_j.row, idx_psi_Nxminus_j.col, +2.0));
         }
 
         // - Top boundary -
@@ -205,9 +212,9 @@ namespace vorcity_transfer {
             const auto idx_psi_i_Ny      = ps.ij_to_rc(i, Ny, i, Ny,     equation, Variable::PSI  );
             const auto idx_psi_i_Nyminus = ps.ij_to_rc(i, Ny, i, Ny - 1, equation, Variable::PSI  );
             
-            coef_triplets.push_back(Triplet(idx_w_i_Ny.row,        idx_w_i_Ny.col,         1.0          ));
-            coef_triplets.push_back(Triplet(idx_psi_i_Ny.row,      idx_psi_i_Ny.col,      -two_div_hy_sq));
-            coef_triplets.push_back(Triplet(idx_psi_i_Nyminus.row, idx_psi_i_Nyminus.col, +two_div_hy_sq));
+            coef_triplets.push_back(Triplet(idx_w_i_Ny.row,        idx_w_i_Ny.col,         hy2));
+            coef_triplets.push_back(Triplet(idx_psi_i_Ny.row,      idx_psi_i_Ny.col,      -2.0));
+            coef_triplets.push_back(Triplet(idx_psi_i_Nyminus.row, idx_psi_i_Nyminus.col, +2.0));
         }
 
         // - Left boundary (no corners) -
@@ -222,9 +229,9 @@ namespace vorcity_transfer {
             const auto idx_psi_0_j = ps.ij_to_rc(0, j, 0, j, equation, Variable::PSI  );
             const auto idx_psi_1_j = ps.ij_to_rc(0, j, 1, j, equation, Variable::PSI  );
 
-            coef_triplets.push_back(Triplet(idx_w_0_j.row,   idx_w_0_j.col,    1.0          ));
-            coef_triplets.push_back(Triplet(idx_psi_0_j.row, idx_psi_0_j.col, -two_div_hx_sq));
-            coef_triplets.push_back(Triplet(idx_psi_1_j.row, idx_psi_1_j.col, +two_div_hx_sq));
+            coef_triplets.push_back(Triplet(idx_w_0_j.row,   idx_w_0_j.col,    hx2));
+            coef_triplets.push_back(Triplet(idx_psi_0_j.row, idx_psi_0_j.col, -2.0));
+            coef_triplets.push_back(Triplet(idx_psi_1_j.row, idx_psi_1_j.col, +2.0));
             
         }
     }
@@ -257,17 +264,21 @@ namespace vorcity_transfer {
         const size_type count_x = ps._count_x;
         const size_type count_y = ps._count_y;
 
-        const T div_hx = 1.0 / ps._hx;
-        const T div_hy = 1.0 / ps._hy;
+        // const T div_hx = 1.0 / ps._hx;
+        // const T div_hy = 1.0 / ps._hy;
 
-        const T div_hx2 = div_hx * div_hx;
-        const T div_hy2 = div_hy * div_hy;
+        // const T div_hx2 = div_hx * div_hx;
+        // const T div_hy2 = div_hy * div_hy;
+
+        const T hx2 = ps._hx * ps._hx;
+        const T hy2 = ps._hy * ps._hy;
+        const T hx2_hy2 = hx2 * hy2;
        
-        const T a_P = -2.0 * (div_hx2 + div_hy2);
-        const T a_W = div_hx2;
-        const T a_E = div_hx2;
-        const T a_S = div_hy2;
-        const T a_N = div_hy2;
+        const T a_P = -2.0 * (hx2 + hy2);
+        const T a_W = hy2;
+        const T a_E = hy2;
+        const T a_S = hx2;
+        const T a_N = hx2;
 
         // --- Internal vertices ---
         // Iterate regular 'cross-shaped' template
@@ -287,7 +298,7 @@ namespace vorcity_transfer {
                 const auto idx_psi_S = ps.ij_to_rc(i, j, i,     j - 1, equation, Variable::PSI  );
                 const auto idx_psi_N = ps.ij_to_rc(i, j, i,     j + 1, equation, Variable::PSI  );
 
-                coef_triplets.push_back(Triplet(idx_w_P.row,   idx_w_P.col,   1.0));
+                coef_triplets.push_back(Triplet(idx_w_P.row,   idx_w_P.col,   hx2_hy2));
                 coef_triplets.push_back(Triplet(idx_psi_P.row, idx_psi_P.col, a_P));
                 coef_triplets.push_back(Triplet(idx_psi_W.row, idx_psi_W.col, a_W));
                 coef_triplets.push_back(Triplet(idx_psi_E.row, idx_psi_E.col, a_E));

@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <optional>
 #include <variant>
+#include <ranges>
 
 #include <omp.h>
 
@@ -139,6 +140,10 @@ struct problem_params {
         return i + j * _count_x;
     }
 
+    inline size_type ij_to_k(std::pair<size_type, size_type> ij) const {
+        return ij.first + ij.second * _count_x;
+    }
+
     // mesh indexation convertation to matrix indexation
     inline MatrixIndex ij_to_rc(
         size_type template_i,   size_type template_j,
@@ -196,7 +201,7 @@ struct problem_params {
         const Vector &velocity_u, const Vector &velocity_v, 
         std::optional<std::string> filename = std::nullopt
     ) const {
-        if (!filename) *filename = _filename; 
+        filename = std::optional<std::string>(filename.value_or(_filename));
 
         if (_format == SaveFormat::VTU) {
             this->export_results_as_vtu(sol_prev, velocity_u, velocity_v, filename);
@@ -396,4 +401,17 @@ inline std::ostream& operator<<(std::ostream &cout, const Vector &vec) {
     std::cout << " }";
 
     return cout;
+}
+
+template<class test_container, class actual_container>
+inline void relative_error(const test_container& test, const actual_container& actual, std::optional<std::vector<std::pair<size_type, size_type>>> actual_ij) {
+    for (size_type k = 0; k < test.size(); ++k) { 
+        const T test_val   = test  [k];
+        const T actual_val = actual[k];
+        const T error = std::abs(test_val - actual_val) / (test_val + 1e-16);
+        if (actual_ij.has_value()) {
+            auto& ij = (*actual_ij)[k];
+            std::cout << "error for [" << ij.first << ", " << ij.second << "]: " << error << std::endl;
+        }
+    }
 }

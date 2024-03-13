@@ -4,9 +4,40 @@
 #include "library/proto_utils.hpp" 
 
 Vector test_128() {
+
+    // REFERENCE solution
+    // Test against paper results "High-Re Solutions for Incompressible Flow by U. GHIA"
+    Vector test_i(17);
+           test_i <<   0,   8,   9,   10, 
+                       12,  20,  29,  30, 
+                       64,  103, 110, 116, 
+                       121, 122, 123, 124, 128 ;
+    Vector test_v(17);
+           test_v << 0.00000,  0.27485,  0.29012,  0.30353, 
+                     0.32627,  0.37095,  0.33075,  0.32235,
+                     0.02526, -0.31966, -0.42665, -0.51550,
+                    -0.39188, -0.33714, -0.27669, -0.21388,  0.00000;
+
+    auto compare_to_reference = [&](const problem_params& ps, const Vector& velocity_v, bool verbose = false) {
+        // Choose necessary values 
+        Vector actual_v = Vector::Zero(test_v.size());
+        std::vector<std::pair<size_type, size_type>> actual_ij(test_i.size(), std::make_pair(0, 0));
+        for (size_type testcase = 0; testcase < test_i.size(); ++testcase) { 
+            auto& ij = actual_ij[testcase];
+            ij.first = test_i[testcase];
+            ij.second = 64;
+            const auto k = ps.ij_to_k(ij);
+            actual_v[testcase] = velocity_v(k);
+        }
+
+        // Calculate point-to-point relative error
+        if (verbose) relative_error(test_v, actual_v, actual_ij);
+        return (actual_v - test_v).norm() / (test_v.norm() + 1e-16);
+    };
+
     constexpr size_type Nx = 128;
     constexpr size_type Ny = 128;
-    constexpr size_type steps = 100;
+    constexpr size_type steps = 1000;
     constexpr T L = 1.0;
     constexpr T H = 1.0;
     constexpr T time = 100.0;
@@ -46,18 +77,27 @@ Vector test_128() {
     utl::progressbar::Percentage bar;
     bar.start();
     utl::timer::start();
+    constexpr std::streamsize width = 20;
+
+    log
+            << std::setw(width) << "omega"
+            << std::setw(width) << "omega^2"
+            << std::setw(width) << "epsilon"
+            << std::setw(width) << "dw/dt*psi"
+            << std::setw(width) << "relative_err"
+            << std::endl;
 
     // Iterate over time
     for (size_type step = 0; step < time_steps; ++step) {
         vorcity_transfer::solve(ps, sol_curr, sol_prev, velocity_u, velocity_v, rhs);
 
         // Export integrals related to conservation laws
-        constexpr std::streamsize width = 16;
         log
             << std::setw(width) << test::get_integral_omega(ps, sol_prev)
             << std::setw(width) << test::get_integral_omega2(ps, sol_prev)
             << std::setw(width) << test::get_integral_epsilon(ps, velocity_u, velocity_v)
             << std::setw(width) << test::get_integral_dw_dt_psi(ps, sol_prev, sol_curr)
+            << std::setw(width) << compare_to_reference(ps, velocity_v, false)
             << std::endl;
 
         bar.set_progress(static_cast<double>(step) / time_steps);
@@ -68,22 +108,8 @@ Vector test_128() {
     
     ps.export_results(sol_prev, velocity_u, velocity_v);
 
-    // Test against paper results "High-Re Solutions for Incompressible Flow by U. GHIA"
-    constexpr std::array test_i { 0, 8, 30, 64, 103, 124, 128 };
-    constexpr std::array test_v { 0.00000, 0.27485, 0.32235, 0.02526, -0.31966, -0.21388, 0.00000 };
-
-    for (size_type testcase = 0; testcase < test_i.size(); ++testcase) {
-        const auto i = test_i[testcase];
-        const auto j = 64;
-        const auto k = ps.ij_to_k(i, j);
-
-        const T v_test   = test_v[testcase];
-        const T v_actual = velocity_v(k);
-
-        const T error = std::abs(v_test - v_actual);
-
-        std::cout << "error for v[" << i << ", " << j << "]: " << error << std::endl;
-    }
+    auto error = compare_to_reference(ps, velocity_v, true);
+    std::cout << "Relative vector error = " << error << std::endl;
 
     return sol_curr;
 }
@@ -110,6 +136,14 @@ Vector solve(const problem_params &ps, bool file_logging = true, bool tests = tr
 
     std::ofstream log(ps.get_relative_path("log_integrals.txt"));
 
+    constexpr std::streamsize width = 20;
+    log
+            << std::setw(width) << "omega"
+            << std::setw(width) << "omega^2"
+            << std::setw(width) << "epsilon"
+            << std::setw(width) << "dw/dt*psi"
+            << std::endl;
+
     std::cout
         << "Running 'solve()'..." << std::endl
         << utl::timer::datetime_string() << std::endl;
@@ -131,7 +165,6 @@ Vector solve(const problem_params &ps, bool file_logging = true, bool tests = tr
             // we only export intermediate time layers if it's VTU series
 
         // Export integrals related to conservation laws
-        constexpr std::streamsize width = 16;
         if (tests) log
             << std::setw(width) << test::get_integral_omega(ps, sol_prev)
             << std::setw(width) << test::get_integral_omega2(ps, sol_prev)
