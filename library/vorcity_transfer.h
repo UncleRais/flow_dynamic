@@ -97,6 +97,7 @@ namespace vorcity_transfer {
         std::vector<Triplet> &coef_triplets,
         const Vector &sol_prev,
         const Vector &velocity_u, const Vector &velocity_v,
+        const Vector &temperature_prev,
         Vector &rhs
     ) {
         const auto equation = Equation::FIRST; // => filling the top half of the matrix
@@ -106,25 +107,17 @@ namespace vorcity_transfer {
         const size_type count_x = ps._count_x;
         const size_type count_y = ps._count_y;
 
-        // const T div_tau = 1.0 / ps._tau;
-        // const T div_hx  = 1.0 / ps._hx;
-        // const T div_hy  = 1.0 / ps._hy;
-
-        // const T div_hx2 = div_hx * div_hx;
-        // const T div_hy2 = div_hy * div_hy;
-
         const T hx2 = ps._hx * ps._hx;
         const T hy2 = ps._hy * ps._hy;
 
-        const T nu_hx2 = ps._nu * hx2;
-        const T nu_hy2 = ps._nu * hy2;
+        const T nu_hx2_tau = ps._nu * hx2 * ps._tau;
+        const T nu_hy2_tau = ps._nu * hy2 * ps._tau;
 
         const T hx2_hy2 = hx2 * hy2;
-        const T hx_hy2 = ps._hx * hy2;
-        const T hx2_hy = hx2 * ps._hy;
+        const T hx_hy2_tau = ps._hx * hy2 * ps._tau;
+        const T hx2_hy_tau = hx2 * ps._hy * ps._tau;
 
-        // const T nu_div_hx2 = ps._nu * div_hx2;
-        // const T nu_div_hy2 = ps._nu * div_hy2;
+        const T temp_coef = hx_hy2_tau * ps._Ra * 0.5;
 
         // --- Internal vertices ---
         // Iterate regular 'cross-shaped' template
@@ -132,9 +125,11 @@ namespace vorcity_transfer {
         for (size_type i = 1; i <= Nx - 1; ++i) {
             for (size_type j = 1; j <= Ny - 1; ++j) {
                 // Fill RHS
-                const auto row = ps.ij_to_rhs_row(i, j, equation);
-
-                rhs[row] = hx2_hy2 * sol_prev[row]; /// Temperature impact will be added here
+                const auto row     = ps.ij_to_rhs_row(i,     j, equation);
+                const auto idx_T_E = ps.ij_to_rhs_row(i + 1, j, equation);
+                const auto idx_T_W = ps.ij_to_rhs_row(i - 1, j, equation);
+                // Temperature impact
+                rhs[row] = hx2_hy2 * sol_prev[row] + temp_coef * (temperature_prev[idx_T_E] - temperature_prev[idx_T_W]);
 
                 // Fill Matrix
                 const auto idx_w_P = ps.ij_to_rc(i, j, i,     j,     equation, Variable::OMEGA);
@@ -143,11 +138,11 @@ namespace vorcity_transfer {
                 const auto idx_w_S = ps.ij_to_rc(i, j, i,     j - 1, equation, Variable::OMEGA);
                 const auto idx_w_N = ps.ij_to_rc(i, j, i,     j + 1, equation, Variable::OMEGA);
 
-                const T a_P = hx2_hy2 + 2.0 * (nu_hx2 + nu_hy2);
-                const T a_W = -0.5 * hx_hy2 * velocity_u[ps.ij_to_k(i - 1, j    )] - nu_hy2;
-                const T a_E =  0.5 * hx_hy2 * velocity_u[ps.ij_to_k(i + 1, j    )] - nu_hy2;
-                const T a_S = -0.5 * hx2_hy * velocity_v[ps.ij_to_k(i,     j - 1)] - nu_hx2;
-                const T a_N =  0.5 * hx2_hy * velocity_v[ps.ij_to_k(i,     j + 1)] - nu_hx2;
+                const T a_P = hx2_hy2 + 2.0 * (nu_hx2_tau + nu_hy2_tau);
+                const T a_W = -0.5 * hx_hy2_tau * velocity_u[ps.ij_to_k(i - 1, j    )] - nu_hy2_tau;
+                const T a_E =  0.5 * hx_hy2_tau * velocity_u[ps.ij_to_k(i + 1, j    )] - nu_hy2_tau;
+                const T a_S = -0.5 * hx2_hy_tau * velocity_v[ps.ij_to_k(i,     j - 1)] - nu_hx2_tau;
+                const T a_N =  0.5 * hx2_hy_tau * velocity_v[ps.ij_to_k(i,     j + 1)] - nu_hx2_tau;
 
                 coef_triplets.push_back(Triplet(idx_w_P.row, idx_w_P.col, a_P));
                 coef_triplets.push_back(Triplet(idx_w_W.row, idx_w_W.col, a_W));
@@ -359,6 +354,7 @@ namespace vorcity_transfer {
         const problem_params &ps,
         Vector &sol_prev,   Vector &sol_curr,
         Vector &velocity_u, Vector &velocity_v,
+        const Vector &temperature_prev,
         Vector &rhs
     ) {
         calc_velocity_on_vertices(ps, sol_prev, velocity_u, velocity_v);
@@ -366,7 +362,7 @@ namespace vorcity_transfer {
         std::vector<Triplet> coef_triplets; // non-zero coefs of matrix 'A' as { i, j, value } triplets
         coef_triplets.reserve(3 * ps._size); // not an accurate estimate
 
-        build_system_transfer(ps, coef_triplets, sol_prev, velocity_u, velocity_v, rhs);
+        build_system_transfer(ps, coef_triplets, sol_prev, velocity_u, velocity_v, temperature_prev, rhs);
         build_system_laplace (ps, coef_triplets, sol_prev, velocity_u, velocity_v, rhs);
 
         const bool verbose = (ps._size < 30);

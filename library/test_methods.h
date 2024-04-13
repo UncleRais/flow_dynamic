@@ -109,6 +109,26 @@ namespace test {
         return epsilon;
     }
 
+    inline T get_div_uv(const problem_params &ps, const Vector &velocity_u, const Vector &velocity_v) {
+
+        // Compure div V = div {u, v, 0} = 0
+        T result = T(0.0);
+        const size_type Nx = ps._Nx;
+        const size_type Ny = ps._Ny;
+
+        for (size_type i = 1; i <= Nx - 1; ++i) {
+            for (size_type j = 1; j <= Ny - 1; ++j) {
+                const T u_E = velocity_u[ps.ij_to_k(i + 1, j)];
+                const T u_W = velocity_u[ps.ij_to_k(i - 1, j)];
+                const T v_N = velocity_v[ps.ij_to_k(i, j + 1)];
+                const T v_S = velocity_v[ps.ij_to_k(i, j - 1)];
+                result += (u_E - u_W) / ps._hx + (v_N - v_S) / ps._hy;
+            }
+        }
+
+        return result;
+    }
+
     inline void build_test_problem(std::vector<Triplet> &coefficients, Eigen::VectorXd &b, size_type n){
     for (size_type i = 0; i < n; ++i) {
         b[i] = 0.0001;

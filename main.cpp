@@ -37,18 +37,27 @@ Vector test_128() {
 
     constexpr size_type Nx = 128;
     constexpr size_type Ny = 128;
-    constexpr size_type steps = 1000;
+    constexpr size_type steps = 100;
     constexpr T L = 1.0;
     constexpr T H = 1.0;
     constexpr T time = 100.0;
     constexpr T Re = 1000.0;
+    constexpr T kappa = 0.0;
+    constexpr T lambda = 1e-3;
+    constexpr T Ra = 0.0;
     constexpr std::array<T, 4> boundary_velocities = { 0.0, 0.0, 1.0, 0.0 };
+    constexpr std::array<std::pair<ThermalBoundaryType, T>, 4> boundary_temperature_conditions 
+                                                        = { std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0), 
+                                                            std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0), 
+                                                            std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0),  
+                                                            std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0) };
     constexpr auto filename = "result";
     constexpr auto format = SaveFormat::RAW;
     constexpr Method method = DecompositionMethod::SPARSE_LU;
     //constexpr Method method = IterativeMethodData{ IterativeMethod::BI_CGSTAB, 1e-12, 1000 };
 
-    const problem_params ps(Nx, Ny, steps, L, H, time, 1. / Re, boundary_velocities, method, filename, format);
+    const problem_params ps(Nx, Ny, steps, L, H, time, 1. / Re, kappa, lambda, Ra, 
+                            boundary_velocities,boundary_temperature_conditions, method, filename, format);
 
     const size_type size = ps._size;
     const size_type time_steps = ps._steps;
@@ -56,6 +65,7 @@ Vector test_128() {
     Vector rhs = Vector::Zero(size);
     Vector sol_prev = Vector::Zero(size);
     Vector sol_curr = Vector::Zero(size);
+    Vector temperature = Vector::Zero(ps._count_k);
     Vector velocity_u = Vector::Zero(ps._count_k);
     Vector velocity_v = Vector::Zero(ps._count_k);
         // sol[ 0      ... size/2 ] corresponds to 'omega'
@@ -84,12 +94,13 @@ Vector test_128() {
             << std::setw(width) << "omega^2"
             << std::setw(width) << "epsilon"
             << std::setw(width) << "dw/dt*psi"
+            << std::setw(width) << "div{u, v, 0}"
             << std::setw(width) << "relative_err"
             << std::endl;
 
     // Iterate over time
     for (size_type step = 0; step < time_steps; ++step) {
-        vorcity_transfer::solve(ps, sol_curr, sol_prev, velocity_u, velocity_v, rhs);
+        vorcity_transfer::solve(ps, sol_curr, sol_prev, velocity_u, velocity_v, temperature, rhs);
 
         // Export integrals related to conservation laws
         log
@@ -97,6 +108,7 @@ Vector test_128() {
             << std::setw(width) << test::get_integral_omega2(ps, sol_prev)
             << std::setw(width) << test::get_integral_epsilon(ps, velocity_u, velocity_v)
             << std::setw(width) << test::get_integral_dw_dt_psi(ps, sol_prev, sol_curr)
+            << std::setw(width) << test::get_div_uv(ps, velocity_u, velocity_v)                      
             << std::setw(width) << compare_to_reference(ps, velocity_v, false)
             << std::endl;
 
@@ -106,7 +118,7 @@ Vector test_128() {
     bar.finish();
     std::cout << "Completed in " << utl::timer::elapsed_string_fullform() << std::endl;
     
-    ps.export_results(sol_prev, velocity_u, velocity_v);
+    ps.export_results(sol_prev, temperature, velocity_u, velocity_v);
 
     auto error = compare_to_reference(ps, velocity_v, true);
     std::cout << "Relative vector error = " << error << std::endl;
@@ -119,13 +131,16 @@ Vector solve(const problem_params &ps, bool file_logging = true, bool tests = tr
     const size_type time_steps  = ps._steps;
     const SaveFormat format     = ps._format;
 
-    Vector rhs        = Vector::Zero(size);
-    Vector sol_prev   = Vector::Zero(size);
-    Vector sol_curr   = Vector::Zero(size);
+    Vector rhs_vorcity = Vector::Zero(size);
+    Vector sol_prev    = Vector::Zero(size);
+    Vector sol_curr    = Vector::Zero(size);
+    Vector rhs_temp         = Vector::Zero(ps._count_k);
+    Vector temperature_prev = Vector::Zero(ps._count_k);
+    Vector temperature_curr = Vector::Zero(ps._count_k);
     Vector velocity_u = Vector::Zero(ps._count_k);
     Vector velocity_v = Vector::Zero(ps._count_k);
-        // sol[ 0      ... size/2 ] corresponds to 'omega'
-        // sol[ size/2 ... size   ] corresponds to 'psi'
+    // sol[ 0      ... size/2 ] corresponds to 'omega'
+    // sol[ size/2 ... size   ] corresponds to 'psi'
 
     // Initial conditions:
     // { psi   |t=0   = 0
@@ -142,6 +157,7 @@ Vector solve(const problem_params &ps, bool file_logging = true, bool tests = tr
             << std::setw(width) << "omega^2"
             << std::setw(width) << "epsilon"
             << std::setw(width) << "dw/dt*psi"
+            << std::setw(width) << "div{u, v, 0}"
             << std::endl;
 
     std::cout
@@ -154,14 +170,15 @@ Vector solve(const problem_params &ps, bool file_logging = true, bool tests = tr
     utl::timer::start();
     const auto filename = ps.get_relative_path("result_");
 
-    if (file_logging) ps.export_results(sol_prev, velocity_u, velocity_v, filename + ps.str_i(0));
+    if (file_logging) ps.export_results(sol_prev, temperature_prev, velocity_u, velocity_v, filename + ps.str_i(0));
 
     // Iterate over time
     for (size_type step = 0; step < time_steps; ++step) {
-        vorcity_transfer::solve(ps, sol_curr, sol_prev, velocity_u, velocity_v, rhs);
+        vorcity_transfer::solve    (ps, sol_curr,         sol_prev,         velocity_u, velocity_v, temperature_prev, rhs_vorcity);
+        thermal_conductivity::solve(ps, temperature_curr, temperature_prev, velocity_u, velocity_v, rhs_temp);
 
         if (file_logging && format == SaveFormat::VTU)
-            ps.export_results(sol_prev, velocity_u, velocity_v, filename + ps.str_i(step + 1));
+            ps.export_results(sol_prev, temperature_prev, velocity_u, velocity_v, filename + ps.str_i(step + 1));
             // we only export intermediate time layers if it's VTU series
 
         // Export integrals related to conservation laws
@@ -170,6 +187,7 @@ Vector solve(const problem_params &ps, bool file_logging = true, bool tests = tr
             << std::setw(width) << test::get_integral_omega2(ps, sol_prev)
             << std::setw(width) << test::get_integral_epsilon(ps, velocity_u, velocity_v)
             << std::setw(width) << test::get_integral_dw_dt_psi(ps, sol_prev, sol_curr)
+            << std::setw(width) << test::get_div_uv(ps, velocity_u, velocity_v)
             << std::endl;
 
         bar.set_progress(static_cast<double>(step) / time_steps);
@@ -179,29 +197,44 @@ Vector solve(const problem_params &ps, bool file_logging = true, bool tests = tr
     std::cout << "Completed in " << utl::timer::elapsed_string_fullform() << std::endl;
 
     if (file_logging && format == SaveFormat::VTU) ps.export_vtu_series_metadata("timesteps");
-    else                                           ps.export_results(sol_prev, velocity_u, velocity_v);
+    else                                           ps.export_results(sol_prev, temperature_prev, velocity_u, velocity_v);
     
     return sol_curr;
 }
 
 int main(int argc, char** argv) {
-    constexpr size_type Nx = 200;
-    constexpr size_type Ny = 200;
-    constexpr size_type steps = 200;
+    constexpr size_type Nx = 100;
+    constexpr size_type Ny = 100;
+    constexpr size_type steps = 500;
     constexpr T L = 1.0;
     constexpr T H = 1.0;
-    constexpr T time = 100.0;
+    constexpr T time = 10.0;
     constexpr T nu = 1e-3; // water: 1.787e-6
-    constexpr std::array<T, 4> boundary_velocities = { 0.0, 0.0, -1.0, -0.0 };
+    constexpr T kappa = 1e-3;
+    constexpr T lambda = 1e-3;
+    constexpr T Ra = 1e-3;
+    constexpr std::array<T, 4> boundary_velocities = { 0.0, 0.0, 0.0, 0.0 };
+    constexpr std::array<std::pair<ThermalBoundaryType, T>, 4> boundary_temperature_conditions 
+                                                        = { std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0), 
+                                                            std::make_pair(ThermalBoundaryType::FLUX, 0.0), 
+                                                            std::make_pair(ThermalBoundaryType::TEMPERATURE, 1.0),  
+                                                            std::make_pair(ThermalBoundaryType::FLUX, 0.0) };
+
+    // constexpr std::array<std::pair<ThermalBoundaryType, T>, 4> boundary_temperature_conditions 
+    //                                                     = { std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0), 
+    //                                                         std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0), 
+    //                                                         std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0),  
+    //                                                         std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0) };
     constexpr auto filename = "result";
-    constexpr auto format = SaveFormat::RAW;
+    constexpr auto format = SaveFormat::VTU;
     constexpr Method method = DecompositionMethod::SPARSE_LU;
     //constexpr Method method = IterativeMethodData{ IterativeMethod::BI_CGSTAB, 1e-12, 1000 };
 
-    const problem_params params(Nx, Ny, steps, L, H, time, nu, boundary_velocities, method, filename, format);
+    const problem_params params(Nx, Ny, steps, L, H, time, nu, kappa, lambda, Ra,
+                                boundary_velocities, boundary_temperature_conditions, method, filename, format);
 
-    //const Vector solution = solve(params, true, true);
-    test_128();
+    const Vector solution = solve(params, true, true);
+    // test_128();
 
     return 0;
 }

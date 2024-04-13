@@ -35,6 +35,7 @@ enum class Equation : size_type {
 
 enum class Variable : size_type {
     OMEGA = 0,
+    TEMPERATURE = 0,
     PSI = 1
 };
 
@@ -54,6 +55,11 @@ struct IterativeMethodData {
     IterativeMethod                               method;
     std::optional<T>                              tolerance      = std::nullopt; // default: ~2.2e-16
     std::optional<Eigen::Index>                   max_iterations = std::nullopt; // default:  2 * matrix_size
+};
+
+enum class ThermalBoundaryType {
+    TEMPERATURE,
+    FLUX
 };
 
 using Method = std::variant<DecompositionMethod, IterativeMethodData>;
@@ -84,7 +90,11 @@ struct problem_params {
     T _time;
 
     T _nu;
+    T _kappa;
+    T _lambda;
+    T _Ra;
     std::array<T, 4> _boundary_velocities;
+    std::array<std::pair<ThermalBoundaryType, T>, 4> _boundary_temperature_conditions;
 
     Method _method;
 
@@ -106,8 +116,9 @@ struct problem_params {
     problem_params(
         size_type Nx, size_type Ny, size_type steps,
         T L, T H, T time,
-        T nu, 
+        T nu, T kappa, T lambda, T Ra,
         std::array<T, 4> boundary_velocities,
+        std::array<std::pair<ThermalBoundaryType, T>, 4> boundary_temperature_conditions,
         Method method,
         std::string_view filename,
         SaveFormat format
@@ -115,8 +126,9 @@ struct problem_params {
         // 'Defining' parameters
         _Nx(Nx), _Ny(Ny), _steps(steps),
         _L(L), _H(H), _time(time),
-        _nu(nu),
+        _nu(nu), _kappa(kappa), _lambda(lambda), _Ra(Ra),
         _boundary_velocities(boundary_velocities),
+        _boundary_temperature_conditions(boundary_temperature_conditions),
         _method(method),
         _filename(filename),
         _format(format)
@@ -198,23 +210,24 @@ struct problem_params {
 
     inline void export_results(
         const Vector &sol_prev,
+        const Vector &temperature,
         const Vector &velocity_u, const Vector &velocity_v, 
         std::optional<std::string> filename = std::nullopt
     ) const {
         filename = std::optional<std::string>(filename.value_or(_filename));
 
         if (_format == SaveFormat::VTU) {
-            this->export_results_as_vtu(sol_prev, velocity_u, velocity_v, filename);
+            this->export_results_as_vtu(sol_prev, temperature, velocity_u, velocity_v, filename);
         }
         else if (_format == SaveFormat::RAW) {
-            this->export_results_as_raw(sol_prev, velocity_u, velocity_v);
+            this->export_results_as_raw(sol_prev, temperature, velocity_u, velocity_v);
         }
         else {
             exit_with_error("Unrecognized save format.");
         }
     }
 
-    inline void export_results_as_raw(const Vector &sol_prev, const Vector &velocity_u, const Vector &velocity_v) const {
+    inline void export_results_as_raw(const Vector &sol_prev, const Vector &temperature, const Vector &velocity_u, const Vector &velocity_v) const {
         constexpr auto extension = ".txt";
         constexpr auto error     = "Could not create file.";
         constexpr std::streamsize width = 20;
@@ -262,6 +275,18 @@ struct problem_params {
 
         file.close();
 
+        // Temperature
+        file.open(_filename + "{temp}" + extension);
+        if (!file.is_open()) exit_with_error(error);
+
+        for (size_type i = 0; i <= _Nx; ++i)
+            for (size_type j = 0; j <= _Ny; ++j)
+                file
+                    << std::setw(width) << temperature[ij_to_k(i, j)]
+                    << std::endl;
+
+        file.close();
+
         // U + V
         file.open(_filename + "{uv}" + extension);
         if (!file.is_open()) exit_with_error(error);
@@ -276,7 +301,7 @@ struct problem_params {
         file.close();
     }
 
-    inline void export_results_as_vtu(const Vector &sol_prev, const Vector &velocity_u, const Vector &velocity_v,
+    inline void export_results_as_vtu(const Vector &sol_prev, const Vector &temperature, const Vector &velocity_u, const Vector &velocity_v,
                                std::optional<std::string> filename) const {
 
         std::vector<T> points;
@@ -319,12 +344,14 @@ struct problem_params {
         // Omega, Psi, U + V
         std::vector<T> omega;
         std::vector<T> psi;
+        std::vector<T> temp;
         std::vector<T> uv;
         omega.resize(_count_k);
         psi.resize(_count_k);
         std::copy(sol_prev.begin(),            sol_prev.begin() + _count_k, omega.begin());
         std::copy(sol_prev.begin() + _count_k, sol_prev.end(),              psi.begin());
         for (size_type k = 0; k < _count_k; ++k) {
+            temp.push_back(temperature[k]);
             uv.push_back(velocity_u[k]);
             uv.push_back(velocity_v[k]);
             uv.push_back(T(0.0));
@@ -333,17 +360,18 @@ struct problem_params {
         // Create tuples with (name, association, number of components) for each data set
         std::vector<vtu11::DataSetInfo> dataSetInfo
         {
-            { "Omega",      vtu11::DataSetType::PointData, 1 },
-            { "Psi",        vtu11::DataSetType::PointData, 1 },
-            { "Velocity",   vtu11::DataSetType::PointData, 3 }
+            { "Omega",       vtu11::DataSetType::PointData, 1 },
+            { "Psi",         vtu11::DataSetType::PointData, 1 },
+            { "Temperature", vtu11::DataSetType::PointData, 1 },
+            { "Velocity",    vtu11::DataSetType::PointData, 3 }
         };
 
         
         // Write data to .vtu file using Ascii format
         if (filename.has_value()) { 
-            vtu11::writeVtu( *filename + ".vtu", mesh, dataSetInfo, { omega, psi, uv }, "Ascii" );
+            vtu11::writeVtu( *filename + ".vtu", mesh, dataSetInfo, { omega, psi, temp, uv }, "Ascii" );
         } else {
-            vtu11::writeVtu( _filename + ".vtu", mesh, dataSetInfo, { omega, psi, uv }, "Ascii" );
+            vtu11::writeVtu( _filename + ".vtu", mesh, dataSetInfo, { omega, psi, temp, uv }, "Ascii" );
         }
     }
 
