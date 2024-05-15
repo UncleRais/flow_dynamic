@@ -51,13 +51,15 @@ Vector test_128() {
                                                             std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0), 
                                                             std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0),  
                                                             std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0) };
+    const std::function<T(T, T)> initial_temperature = [&](T x, T y) { return T(0.0);};
+
     constexpr auto filename = "result";
     constexpr auto format = SaveFormat::RAW;
     constexpr Method method = DecompositionMethod::SPARSE_LU;
     //constexpr Method method = IterativeMethodData{ IterativeMethod::BI_CGSTAB, 1e-12, 1000 };
 
     const problem_params ps(Nx, Ny, steps, L, H, time, 1. / Re, kappa, lambda, Ra, 
-                            boundary_velocities,boundary_temperature_conditions, method, filename, format);
+                            boundary_velocities,boundary_temperature_conditions, initial_temperature, method, filename, format);
 
     const size_type size = ps._size;
     const size_type time_steps = ps._steps;
@@ -145,9 +147,10 @@ Vector solve(const problem_params &ps, bool file_logging = true, bool tests = tr
     // Initial conditions:
     // { psi   |t=0   = 0
     // { omega |t=0   = 0
-    // { T     |t=0   = dirac_delta(L/2, H/2)
+    // { T     |t=0   = <Linear distribution>
     // The choise of initial 'T' introduces disturbance to the system => vorcity
     vorcity_transfer::set_velocity_on_boundary(ps, velocity_u, velocity_v);
+    thermal_conductivity::set_initial_temperature(ps, temperature_prev);
 
     std::ofstream log(ps.get_relative_path("log_integrals.txt"));
 
@@ -174,8 +177,8 @@ Vector solve(const problem_params &ps, bool file_logging = true, bool tests = tr
 
     // Iterate over time
     for (size_type step = 0; step < time_steps; ++step) {
-        vorcity_transfer::solve    (ps, sol_curr,         sol_prev,         velocity_u, velocity_v, temperature_prev, rhs_vorcity);
-        thermal_conductivity::solve(ps, temperature_curr, temperature_prev, velocity_u, velocity_v, rhs_temp);
+        vorcity_transfer::solve    (ps, sol_prev,         sol_curr,         velocity_u, velocity_v, temperature_prev, rhs_vorcity);
+        thermal_conductivity::solve(ps, temperature_prev, temperature_curr, velocity_u, velocity_v, rhs_temp);
 
         if (file_logging && format == SaveFormat::VTU)
             ps.export_results(sol_prev, temperature_prev, velocity_u, velocity_v, filename + ps.str_i(step + 1));
@@ -203,22 +206,28 @@ Vector solve(const problem_params &ps, bool file_logging = true, bool tests = tr
 }
 
 int main(int argc, char** argv) {
-    constexpr size_type Nx = 100;
-    constexpr size_type Ny = 100;
-    constexpr size_type steps = 500;
+    constexpr size_type Nx = 26;
+    constexpr size_type Ny = 26;
+    constexpr size_type steps = 2000;
     constexpr T L = 1.0;
     constexpr T H = 1.0;
-    constexpr T time = 10.0;
-    constexpr T nu = 1e-3; // water: 1.787e-6
-    constexpr T kappa = 1e-3;
-    constexpr T lambda = 1e-3;
-    constexpr T Ra = 1e-3;
+    constexpr T time = 200.0;
+    constexpr T nu = 1; // water: 1.787e-6
+    constexpr T kappa = 1;
+    constexpr T lambda = 1;
+    constexpr T Ra = 30080;
     constexpr std::array<T, 4> boundary_velocities = { 0.0, 0.0, 0.0, 0.0 };
     constexpr std::array<std::pair<ThermalBoundaryType, T>, 4> boundary_temperature_conditions 
                                                         = { std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0), 
                                                             std::make_pair(ThermalBoundaryType::FLUX, 0.0), 
                                                             std::make_pair(ThermalBoundaryType::TEMPERATURE, 1.0),  
                                                             std::make_pair(ThermalBoundaryType::FLUX, 0.0) };
+    constexpr T var = 1 / L * 2 * M_PI;
+    const std::function<T(T, T)> initial_temperature = [&](T x, T y) { 
+        if (std::abs(y - H * 0.33333333) < 0.01) 
+            return y + 0.01 * std::sin(x * var);
+        return y;
+    };
 
     // constexpr std::array<std::pair<ThermalBoundaryType, T>, 4> boundary_temperature_conditions 
     //                                                     = { std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0), 
@@ -231,10 +240,10 @@ int main(int argc, char** argv) {
     //constexpr Method method = IterativeMethodData{ IterativeMethod::BI_CGSTAB, 1e-12, 1000 };
 
     const problem_params params(Nx, Ny, steps, L, H, time, nu, kappa, lambda, Ra,
-                                boundary_velocities, boundary_temperature_conditions, method, filename, format);
+                                boundary_velocities, boundary_temperature_conditions, initial_temperature, method, filename, format);
 
     const Vector solution = solve(params, true, true);
-    // test_128();
+    //test_128();
 
     return 0;
 }

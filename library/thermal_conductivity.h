@@ -6,6 +6,18 @@
 
 namespace thermal_conductivity {
 
+    inline void set_initial_temperature(const problem_params &ps, Vector &temperature) {
+        // iterations over all grid nodes
+        const size_type Nx = ps._Nx;
+        const size_type Ny = ps._Ny;
+
+        for (size_type i = 0; i <= Nx; ++i) 
+            for (size_type j = 0; j <= Ny; ++j) {
+                const auto k = ps.ij_to_k(i, j);
+                temperature[k] = ps._initial_temperature(i * ps._hx, j * ps._hy);
+            }
+    }
+
 
     // --- 1st equation ---
     //

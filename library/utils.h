@@ -93,6 +93,7 @@ struct problem_params {
     T _kappa;
     T _lambda;
     T _Ra;
+    std::function<T(T, T)> _initial_temperature;
     std::array<T, 4> _boundary_velocities;
     std::array<std::pair<ThermalBoundaryType, T>, 4> _boundary_temperature_conditions;
 
@@ -119,6 +120,7 @@ struct problem_params {
         T nu, T kappa, T lambda, T Ra,
         std::array<T, 4> boundary_velocities,
         std::array<std::pair<ThermalBoundaryType, T>, 4> boundary_temperature_conditions,
+        std::function<T(T, T)> initial_temperature,
         Method method,
         std::string_view filename,
         SaveFormat format
@@ -129,6 +131,7 @@ struct problem_params {
         _nu(nu), _kappa(kappa), _lambda(lambda), _Ra(Ra),
         _boundary_velocities(boundary_velocities),
         _boundary_temperature_conditions(boundary_temperature_conditions),
+        _initial_temperature(initial_temperature),
         _method(method),
         _filename(filename),
         _format(format)
