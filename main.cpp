@@ -229,11 +229,6 @@ int main(int argc, char** argv) {
         return y;
     };
 
-    // constexpr std::array<std::pair<ThermalBoundaryType, T>, 4> boundary_temperature_conditions 
-    //                                                     = { std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0), 
-    //                                                         std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0), 
-    //                                                         std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0),  
-    //                                                         std::make_pair(ThermalBoundaryType::TEMPERATURE, 0.0) };
     constexpr auto filename = "result";
     constexpr auto format = SaveFormat::VTU;
     constexpr Method method = DecompositionMethod::SPARSE_LU;
