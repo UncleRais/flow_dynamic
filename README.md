@@ -27,5 +27,6 @@ $T$ - temperature field, Ra - Rayleigh number, $\nu$ - kinematic viscosity, $\ps
 
 Thermal conductivity equation:<br>
 $$\frac{\partial T}{\partial t} + (\vec{V} \cdot \nabla)T = \varkappa \Delta T, $$
+$$T_{y = 0} = T_{bot}, \quad T_{y = H} = T_{top}, \quad \vec{n} \cdot \vec{q}|_{x = 0 \cup x = L} = 0, \quad \vec{q} = - \lambda \nabla T, $$
 where<br>
-$\kappa$ - thermal diffusivity coefficient.
+$\varkappa = \lambda / c \rho$ - thermal diffusivity coefficient, $\lambda$ - thermal conductivity, $\vec{q}$ - heat flow vector.
